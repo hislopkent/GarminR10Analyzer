@@ -16,6 +16,8 @@ if uploaded_files:
     for file in uploaded_files:
         try:
             df = pd.read_csv(file)
+        if 'Club Type' in df.columns:
+            df.rename(columns={'Club Type': 'Club'}, inplace=True)
             df["Session"] = file.name
             all_data.append(df)
         except Exception as e:
