@@ -2,81 +2,82 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from io import StringIO
+import base64
+import datetime
 
-st.set_page_config(page_title="Garmin R10 Multi-Session Analyzer with AI Summaries")
+st.set_page_config(page_title="Garmin R10 Analyzer", layout="wide")
 
 st.title("📊 Garmin R10 Multi-Session Analyzer with AI Summaries")
+
 uploaded_files = st.file_uploader("Upload one or more Garmin R10 CSV files", type="csv", accept_multiple_files=True)
 
-if uploaded_files:
-    dfs = []
+@st.cache_data
+def load_and_process_data(uploaded_files):
+    df_all = pd.DataFrame()
     for uploaded_file in uploaded_files:
-        df = pd.read_csv(uploaded_file)
-        df['Session'] = uploaded_file.name
+        try:
+            df = pd.read_csv(uploaded_file)
+            if 'Club' not in df.columns:
+                if 'Club Type' in df.columns:
+                    df['Club'] = df['Club Type']
+                else:
+                    st.warning(f"Missing 'Club' or 'Club Type' in {uploaded_file.name}")
+                    continue
 
-        if 'Club Type' not in df.columns:
-            st.warning(f"The following required columns are missing in {uploaded_file.name}: Club Type")
-            continue
+            # Generate Session name based on timestamp with session index
+            if 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                df = df.dropna(subset=['Date'])
+                df = df.sort_values('Date')
+                df['SessionDate'] = df['Date'].dt.strftime('%Y-%m-%d')
+                df['SessionIndex'] = df.groupby('SessionDate').cumcount() // 25 + 1
+                df['Session'] = df['SessionDate'] + ' Session ' + df['SessionIndex'].astype(str)
+            else:
+                df['Session'] = uploaded_file.name.replace(".csv", "")
 
-        df.rename(columns={'Club Type': 'Club'}, inplace=True)
-        dfs.append(df)
+            df_all = pd.concat([df_all, df], ignore_index=True)
+        except Exception as e:
+            st.error(f"Error processing {uploaded_file.name}: {e}")
+    return df_all
 
-    if not dfs:
-        st.stop()
+if uploaded_files:
+    df_all = load_and_process_data(uploaded_files)
 
-    df_all = pd.concat(dfs, ignore_index=True)
-
-    # Data validation
-    df_all = df_all.dropna(subset=['Club'])
-
-    # Session filter
-    try:
-        df_all['Session'] = df_all['Session'].astype(str)
-        sessions = sorted([str(s) for s in df_all["Session"].unique()])
-    except Exception as e:
-        sessions = []
-        st.error(f"Session error: {e}")
-
+    sessions = sorted(df_all["Session"].dropna().astype(str).unique())
     selected_session = st.selectbox("Filter by session", ["All Sessions"] + sessions)
 
-    if selected_session != "All Sessions":
-        df_all = df_all[df_all["Session"] == selected_session]
-
-    # Club filter
-    try:
-        df_all['Club'] = df_all['Club'].astype(str)
-        clubs = sorted([str(c) for c in df_all['Club'].unique()])
-    except Exception as e:
-        clubs = []
-        st.error(f"Club error: {e}")
-
+    clubs = sorted(df_all["Club"].dropna().astype(str).unique())
     selected_club = st.selectbox("Select a club", clubs)
 
-    filtered = df_all[df_all['Club'] == selected_club]
-    st.dataframe(filtered)
+    filtered = df_all.copy()
+    if selected_session != "All Sessions":
+        filtered = filtered[filtered["Session"] == selected_session]
+    if selected_club:
+        filtered = filtered[filtered["Club"] == selected_club]
 
-    # Download button
-    csv = filtered.to_csv(index=False).encode('utf-8')
-    st.download_button("⬇️ Download Filtered CSV", csv, "filtered_data.csv", "text/csv")
+    st.subheader("📄 Download Filtered CSV")
+    csv = filtered.to_csv(index=False)
+    b64 = base64.b64encode(csv.encode()).decode()
+    href = f'<a href="data:file/csv;base64,{b64}" download="filtered_data.csv">Download Filtered CSV</a>'
+    st.markdown(href, unsafe_allow_html=True)
 
-    # Summary stats
-    st.subheader("📈 Key Metrics Summary")
-    numeric_cols = filtered.select_dtypes(include='number').columns
-    if not numeric_cols.empty:
-        summary = filtered[numeric_cols].describe().round(2)
-        st.dataframe(summary)
-    else:
-        st.info("No numeric columns available for summary.")
+    if not filtered.empty:
+        st.subheader("📈 Key Metrics Summary")
+        numeric_cols = filtered.select_dtypes(include=['number']).columns
+        st.dataframe(filtered[numeric_cols].describe().T)
 
-    # Chart visualizer
-    st.subheader("📊 Visuals")
-    chart_metric = st.selectbox("Select metric to chart", numeric_cols)
-
-    if chart_metric:
+        st.subheader("📊 Visuals")
+        selected_metric = st.selectbox("Select metric to chart", numeric_cols)
         fig, ax = plt.subplots()
-        filtered[chart_metric].plot(kind='hist', bins=15, ax=ax, title=f"{chart_metric} Distribution")
+        filtered.boxplot(column=selected_metric, by="Club", ax=ax)
+        plt.title(f"{selected_metric} by Club")
+        plt.suptitle("")
+        plt.xticks(rotation=45)
         st.pyplot(fig)
 
-    # AI Summary Placeholder
-    st.subheader("🧠 AI Summary (coming soon)")
-    st.write("AI-generated feedback based on your session data will appear here.")
+        st.subheader("💡 AI Summary")
+        summary = f"You selected {selected_club} from {selected_session}. Mean {selected_metric}: {filtered[selected_metric].mean():.2f}."
+        st.write(summary)
+    else:
+        st.warning("No data to display for selected filters.")
