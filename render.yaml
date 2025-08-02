@@ -1,7 +1,8 @@
 
 services:
   - type: web
-    name: garmin-r10-ai-app
-    env: docker
+    name: garmin-r10-analyzer
+    env: python
     plan: free
-    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port=10000 --server.enableCORS=false
