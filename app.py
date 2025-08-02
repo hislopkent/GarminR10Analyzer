@@ -14,9 +14,9 @@ if uploaded_file:
     # Add fallback for club column
     if 'Club' not in df.columns:
         if 'Club Type' in df.columns:
-            df['Club'] = df['Club Name']
-        elif 'Club Name' in df.columns:
             df['Club'] = df['Club Type']
+        elif 'Club Name' in df.columns:
+            df['Club'] = df['Club Name']
         else:
             st.warning("Could not detect club column.")
             st.stop()
