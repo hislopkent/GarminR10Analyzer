@@ -1,60 +1,73 @@
 
 import streamlit as st
 import pandas as pd
-import io
+import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Garmin R10 Multi-Session Analyzer with AI Summaries", layout="wide")
+st.set_page_config(page_title="Garmin R10 Multi-Session Analyzer with AI Summaries")
+
 st.title("📊 Garmin R10 Multi-Session Analyzer with AI Summaries")
+st.markdown("Upload one or more Garmin R10 CSV files")
 
-uploaded_files = st.file_uploader("Upload one or more Garmin R10 CSV files", type=["csv"], accept_multiple_files=True)
+uploaded_files = st.file_uploader("Upload your Garmin R10 CSV", type=["csv"], accept_multiple_files=True)
 
 if uploaded_files:
     dfs = []
-    for file in uploaded_files:
-        df = pd.read_csv(file)
+    for uploaded_file in uploaded_files:
+        df = pd.read_csv(uploaded_file)
+
+        # Rename 'Club Type' to 'Club' for internal use
         if 'Club Type' in df.columns:
-            df = df.rename(columns={'Club Type': 'Club'})
-        else:
-            st.error(f"'Club Type' column is missing in {file.name}. Cannot process this file.")
-            continue
-        df['Session'] = file.name
+            df.rename(columns={'Club Type': 'Club'}, inplace=True)
+
+        # Add a 'Session' column based on filename
+        df["Session"] = uploaded_file.name
         dfs.append(df)
 
-    if dfs:
-        df_all = pd.concat(dfs, ignore_index=True)
+    df_all = pd.concat(dfs, ignore_index=True)
 
-        # Data type cleanup
-        df_all['Club'] = df_all['Club'].astype(str)
-        df_all['Session'] = df_all['Session'].astype(str)
+    # Handle missing Club column
+    if 'Club' not in df_all.columns:
+        st.warning("The following required column is missing: Club")
+    else:
+        st.subheader("Filter by session")
+        try:
+            sessions = df_all["Session"].dropna().astype(str).unique()
+            selected_session = st.selectbox("Select session", ["All Sessions"] + sorted(sessions))
+        except Exception as e:
+            st.error(f"Session filter error: {e}")
+            selected_session = "All Sessions"
 
-        st.markdown("### Filter by session")
-        session_options = sorted(df_all['Session'].dropna().unique(), key=str)
-        selected_session = st.selectbox("Select a session", options=["All Sessions"] + session_options)
+        st.subheader("Select a club")
+        try:
+            clubs = df_all["Club"].dropna().astype(str).unique()
+            selected_club = st.selectbox("Select a club", sorted(clubs))
+        except Exception as e:
+            st.error(f"Club filter error: {e}")
+            selected_club = None
 
-        if selected_session != "All Sessions":
-            df_all = df_all[df_all['Session'] == selected_session]
+        # Apply filters
+        try:
+            filtered = df_all[df_all["Club"] == selected_club]
+            if selected_session != "All Sessions":
+                filtered = filtered[filtered["Session"] == selected_session]
+        except Exception as e:
+            st.error(f"Filter application error: {e}")
+            filtered = pd.DataFrame()
 
-        st.markdown("### Select a club")
-        club_options = sorted(df_all['Club'].dropna().unique(), key=str)
-        selected_club = st.selectbox("Select a club", club_options)
+        if not filtered.empty:
+            st.subheader("Filtered Data")
+            st.dataframe(filtered)
 
-        filtered_df = df_all[df_all['Club'] == selected_club]
+            st.download_button("Download Filtered CSV", data=filtered.to_csv(index=False), file_name="filtered_data.csv")
 
-        st.markdown(f"### Raw data for {selected_club}")
-        st.dataframe(filtered_df)
-
-        if not filtered_df.empty:
-            st.download_button("📥 Download Filtered CSV", data=filtered_df.to_csv(index=False), file_name=f"{selected_club}_filtered.csv", mime="text/csv")
-
-            st.markdown("### 📈 Key Metrics Summary")
-            st.write(filtered_df.describe(include='all'))
-
-            st.markdown("### 📊 Visuals")
-            numeric_columns = filtered_df.select_dtypes(include=['float64', 'int64']).columns.tolist()
-            if numeric_columns:
-                chart_metric = st.selectbox("Select metric to chart", options=numeric_columns)
-                st.line_chart(filtered_df[chart_metric])
-            else:
-                st.warning("No numeric data available for charting.")
+            st.subheader("Club Speed Over Time")
+            if "Club Speed" in filtered.columns:
+                fig, ax = plt.subplots()
+                filtered["Club Speed"] = pd.to_numeric(filtered["Club Speed"], errors="coerce")
+                ax.plot(filtered["Club Speed"].reset_index(drop=True))
+                ax.set_ylabel("Club Speed (mph)")
+                ax.set_xlabel("Shot Number")
+                ax.grid(True)
+                st.pyplot(fig)
         else:
-            st.warning("Not enough data for summary.")
+            st.warning("No data to display for selected filters.")
