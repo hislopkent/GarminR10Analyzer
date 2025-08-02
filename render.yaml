@@ -2,7 +2,11 @@
 services:
   - type: web
     name: garmin-r10-analyzer
-    env: python
+    env: docker
+    repo: https://github.com/hislopkent/GarminR10Analyzer
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run app.py --server.port=10000 --server.enableCORS=false
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 8501
+    dockerCommand: streamlit run app.py --server.port $PORT --server.enableCORS false
