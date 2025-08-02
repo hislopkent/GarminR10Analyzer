@@ -56,6 +56,9 @@ if uploaded_files:
                     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
                 if 'Club Type' in df.columns:
                     df.rename(columns={'Club Type': 'Club', 'Carry Distance': 'Carry', 'Total Distance': 'Total'}, inplace=True)
+                    # Ensure numeric conversion after rename
+                    df['Carry'] = pd.to_numeric(df['Carry'], errors='coerce')
+                    df['Total'] = pd.to_numeric(df['Total'], errors='coerce')
                 dfs.append(df)
                 total_rows += len(df)
                 # Update progress
@@ -80,10 +83,13 @@ if uploaded_files:
                 file_name="processed_r10_data.csv",
                 mime="text/csv"
             )
-            # Quick metric
+            # Quick metric with type checking
             if 'Carry' in df_all.columns:
-                avg_carry = df_all['Carry'].mean().round(1)
-                st.metric("Average Carry (All Clubs)", f"{avg_carry} yards")
+                if df_all['Carry'].dtype == 'object':
+                    st.warning("Carry column contains non-numeric data. Please check your CSV.")
+                else:
+                    avg_carry = df_all['Carry'].mean().round(1)
+                    st.metric("Average Carry (All Clubs)", f"{avg_carry} yards")
 
 # Clear data button
 if 'df_all' in st.session_state:
