@@ -9,10 +9,13 @@ uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
     st.write("### Raw Data", df.head())
-
-    if 'Club' in df.columns:
-        selected_club = st.selectbox("Select Club", df['Club'].unique())
-        filtered_df = df[df['Club'] == selected_club]
-        st.write(f"### Data for {selected_club}", filtered_df.describe())
+	
+    # Instead of checking for 'Club', use 'Club Name' or fallback
+	if 'Club' not in df.columns:
+    	if 'Club Type' in df.columns:
+        	df['Club'] = df['Club Name']
+    	elif 'Club Name ' in df.columns:
+        	df['Club'] = df['Club Type']
     else:
-        st.warning("No 'Club' column found in your data.")
+        st.warning("No identifiable club column found.")
+    
