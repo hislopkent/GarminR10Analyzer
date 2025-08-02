@@ -68,6 +68,8 @@ if uploaded_files:
         else:
             df_all = pd.concat(dfs, ignore_index=True)
             if 'Date' in df_all.columns:
+                # Drop rows with invalid/NaT dates (e.g., units row)
+                df_all = df_all.dropna(subset=['Date'])
                 df_all['Session'] = create_session_name(df_all['Date'])
             st.session_state['df_all'] = df_all
             st.success(f"✅ Loaded {total_rows} shots from {len(dfs)} file(s).")
