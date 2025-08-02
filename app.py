@@ -35,7 +35,7 @@ if uploaded_files:
 
             df_all['Club Type'] = df_all['Club Type'].astype(str)
 
-            sessions = sorted(df_all['Session'].dropna().unique())
+            sessions = sorted(df_all["Session"].astype(str).unique())
             selected_session = st.selectbox("Filter by session", ["All Sessions"] + list(sessions))
 
             if selected_session != "All Sessions":
