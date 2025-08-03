@@ -37,22 +37,22 @@ if df_all is None or df_all.empty:
     st.warning("No session data uploaded yet. Go to the Home page to upload.")
 else:
     st.subheader("Averages per Club")
-    key_cols = ['Carry', 'Sidespin', 'Smash Factor', 'Launch Angle', 'Apex Height', 'Backspin', 'Face to Path', 'Club Path']
+    numeric_cols = ['Carry', 'Backspin', 'Sidespin', 'Total', 'Smash Factor', 'Apex Height', 'Launch Angle', 'Attack Angle']
     df_all = df_all.copy()
     
-    for col in key_cols:
+    for col in numeric_cols:
         if col in df_all.columns:
             df_all[col] = pd.to_numeric(df_all[col], errors='coerce')
     
-    df_all = df_all.dropna(subset=key_cols, how='any')
+    df_all = df_all.dropna(subset=numeric_cols, how='any')
     
     sessions = st.multiselect("Select Sessions", df_all['Session'].unique(), default=df_all['Session'].unique(), help="Sessions are created per day from uploaded CSVs.")
     clubs = st.multiselect("Select Clubs", df_all['Club'].unique(), default=df_all['Club'].unique())
     filtered = df_all[df_all['Session'].isin(sessions) & df_all['Club'].isin(clubs)] if sessions and clubs else df_all
     
-    if filtered[key_cols].dtypes.any() == 'object':
-        st.warning("One or more key columns contain non-numeric data. Aggregates may be incomplete.")
-        st.write("Column dtypes:", filtered[key_cols].dtypes)
+    if filtered[numeric_cols].dtypes.any() == 'object':
+        st.warning("One or more numeric columns contain non-numeric data. Aggregates may be incomplete.")
+        st.write("Column dtypes:", filtered[numeric_cols].dtypes)
     
     remove_outliers_iqr = st.checkbox("Remove Outliers (based on Carry IQR per club)", value=False)
     remove_contact_outliers = st.checkbox("Remove Fat/Thin Shots (based on Smash Factor, Launch Angle, Backspin, Attack Angle)", value=False)
@@ -78,9 +78,8 @@ else:
             backspin = row['Backspin']
             attack = row['Attack Angle']
             
-            # Updated benchmarks from search
             if 'Driver' in club:
-                return smash < 1.45 or launch < 10 or launch > 15 or backspin < 2000 or backspin > 3000 or attack < -2 or attack > 5
+                return smash < 1.4 or launch < 8 or launch > 16 or backspin < 1500 or backspin > 3500 or attack < -2 or attack > 5
             elif 'Iron' in club:
                 return smash < 1.3 or launch < 10 or launch > 22 or backspin < 4000 or backspin > 9000 or attack < -5 or attack > 0
             elif 'Wedge' in club:
@@ -91,91 +90,51 @@ else:
         filtered = filtered[~filtered.apply(is_poor_contact, axis=1)]
         st.info("Fat/thin shots removed using thresholds on Smash Factor (poor contact), Launch Angle (high/low), Backspin (extreme), and Attack Angle (too negative for fat). Thresholds are club-specific.")
 
-    grouped = filtered.groupby('Club')[key_cols].agg(['mean', 'median', 'std', 'min', 'max']).round(1)
+    @st.cache_data
+    def compute_grouped(filtered):
+        return filtered.groupby('Club')[numeric_cols].agg(['mean', 'median', 'std']).round(1)
+
+    grouped = compute_grouped(filtered)
     
     grouped_flat = grouped.copy()
     grouped_flat.columns = [f"{col[0]}_{col[1]}" for col in grouped_flat.columns]
     grouped_flat = grouped_flat.reset_index()
     
-    # Styled table with color coding
-    def highlight_key_metrics(s):
-        if s.name == 'Carry_mean':
-            return ['background-color: red' if v < 200 else 'background-color: green' for v in s]
-        elif s.name == 'Sidespin_mean':
-            return ['background-color: red' if abs(v) > 500 else 'background-color: green' for v in s]
-        elif s.name == 'Smash Factor_mean':
-            return ['background-color: red' if v < 1.3 else 'background-color: green' for v in s]
-        elif s.name == 'Launch Angle_mean':
-            return ['background-color: red' if v < 10 or v > 20 else 'background-color: green' for v in s]
-        elif s.name == 'Apex Height_mean':
-            return ['background-color: red' if v < 20 or v > 40 else 'background-color: green' for v in s]
-        elif s.name == 'Backspin_mean':
-            return ['background-color: red' if v < 2000 or v > 8000 else 'background-color: green' for v in s]
-        elif s.name == 'Face to Path_mean' or s.name == 'Club Path_mean':
-            return ['background-color: red' if abs(v) > 2 else 'background-color: green' for v in s]
-        return ['background-color: white' for _ in s]
-
-    styled_table = grouped_flat.style.apply(highlight_key_metrics, subset=[f'{metric}_mean' for metric in key_cols])
-    st.dataframe(styled_table, use_container_width=True)
-    
-    # Average Carry per club (post-filters)
-    st.subheader("Average Carry Distance per Club (Outliers Removed)")
-    avg_carry_per_club = grouped_flat[['Club', 'Carry_mean']]
-    avg_carry_per_club.columns = ['Club', 'Avg Carry (Yards)']
-    st.dataframe(avg_carry_per_club, use_container_width=True)
+    st.dataframe(grouped_flat, use_container_width=True)
     
     st.markdown("""
     ### Statistic Explanations
-    - **Mean**: Average performance; e.g., mean Carry shows typical distance—aim to increase for better range.
-    - **Median**: Middle value, less affected by poor shots; compare to mean to spot extremes.
-    - **Std**: Variability; low std = consistent shots (e.g., Carry std <10 yards is tight grouping).
-    - **Min/Max**: Range of values; useful for spotting extremes.
-    Color coding: Green = within typical benchmarks, Red = outside (based on general golf standards; customize if needed).
-    """, unsafe_allow_html=True)
+    - **Mean**: The average value, representing your typical performance across shots (e.g., mean Carry is your average distance).
+    - **Median**: The middle value, ignoring extreme outliers (e.g., poor shots); useful for consistent performance assessment.
+    - **Std (Standard Deviation)**: Measures variability; lower values indicate more consistent shots (e.g., low Carry std means reliable distance).
+    """)
     
     if not grouped_flat.empty:
-        metric = st.selectbox("Select Metric for Chart", key_cols, index=0)
+        metric = st.selectbox("Select Metric for Chart", numeric_cols, index=0)
         chart_data = grouped_flat[['Club', f'{metric}_mean', f'{metric}_median', f'{metric}_std']]
         chart_data = chart_data.melt(id_vars=['Club'], value_vars=[f'{metric}_mean', f'{metric}_median'], var_name='Stat', value_name='Value')
         chart_data['Std'] = chart_data.apply(lambda row: grouped_flat.loc[grouped_flat['Club'] == row['Club'], f'{metric}_std'].values[0] if row['Stat'] == f'{metric}_mean' else 0, axis=1)
+        chart_data['Value'] = chart_data['Value'].round(1)  # Reduce decimals
         
         fig = px.bar(chart_data, x='Club', y='Value', color='Stat', barmode='group',
                      error_y='Std' if 'Std' in chart_data.columns else None,
                      title=f'{metric}: Mean and Median with Std Deviation')
-        fig.update_layout(yaxis_title=metric, hovermode="x")
+        fig.update_layout(yaxis_title=metric, hovermode="x", yaxis_tickformat=".1f")  # Reduce decimals on axis
         st.plotly_chart(fig, use_container_width=True)
     
     st.subheader("AI Insights")
-    focus = st.text_input("AI Focus (e.g., 'irons only' or 'distance improvement')", "")
-    # Retrieve API key and Assistant ID from Render environment variables
-    api_key = os.environ.get("OPENAI_API_KEY")
-    assistant_id = os.environ.get("ASSISTANT_ID")
-    if not api_key or not assistant_id:
-        st.warning("OpenAI API Key or Assistant ID not set in Render environment variables. Set OPENAI_API_KEY and ASSISTANT_ID in your Render dashboard.")
-    elif st.button("Generate AI Insights"):
+    api_key = st.text_input("Enter OpenAI API Key", type="password")
+    if api_key and st.button("Generate AI Insights"):
         try:
             client = openai.OpenAI(api_key=api_key)
-            thread = client.beta.threads.create()
-            # Send all filtered data if small, else sample
-            if len(filtered) < 200:
-                data_str = filtered.to_string()
-            else:
-                data_str = filtered.sample(200).to_string()
-            message = client.beta.threads.messages.create(
-                thread_id=thread.id,
-                role="user",
-                content=f"Full filtered shot data:\n{data_str}\nAggregated averages per club (mean, median, std, min, max for Carry, Sidespin, Smash Factor, Launch Angle, Apex Height, Backspin, Face to Path, Club Path):\n{grouped.to_string()}\nProvide suggestions, comments, and recommendations for improving performance on each club. Focus on {focus if focus else 'general'} aspects like fat/thin shots (low Smash Factor, extreme Launch Angle/Backspin), outliers, consistency, and typical golf benchmarks (e.g., driver carry >200 yards, irons Smash Factor >1.3), based on the actual values in the full data and the aggregated stats."
+            prompt = f"Based on these golf shot averages per club (mean, median, std for Carry, Backspin, Sidespin, Total, Smash Factor, Apex Height, Launch Angle, Attack Angle):\n{grouped.to_string()}\nProvide suggestions, comments, and recommendations for improving performance. Focus on {focus if focus else 'general'} aspects like fat/thin shots (low Smash Factor, extreme Launch Angle/Backspin), outliers, consistency, and typical golf benchmarks (e.g., driver carry >200 yards, irons Smash Factor >1.3)."
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "system", "content": "You are a golf performance analyst."}, {"role": "user", "content": prompt}]
             )
-            run = client.beta.threads.runs.create(
-                thread_id=thread.id,
-                assistant_id=assistant_id
-            )
-            import time
-            while run.status != "completed":
-                time.sleep(1)
-                run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
-            messages = client.beta.threads.messages.list(thread_id=thread.id)
-            insights = messages.data[0].content[0].text.value
+            insights = response.choices[0].message.content
             st.write(insights)
         except Exception as e:
-            st.error(f"Error generating insights: {str(e)}. Check environment variables or try again. If quota exceeded, upgrade your OpenAI plan at https://platform.openai.com/account/billing or wait for reset.")
+            st.error(f"Error generating insights: {str(e)}. Check your API key or try again. If quota exceeded, upgrade your OpenAI plan at https://platform.openai.com/account/billing or wait for reset.")
+    elif not api_key:
+        st.info("Enter your OpenAI API key above to generate AI-powered suggestions on your data (e.g., 'Improve driver smash factor for better distance'). Get a key at openai.com.")
