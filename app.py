@@ -13,5 +13,6 @@ uploaded_files = st.file_uploader(
 if uploaded_files:
     st.session_state["uploaded_files"] = uploaded_files
     logger.info(f"{len(uploaded_files)} files uploaded and stored in session state")
+    st.experimental_rerun()
 else:
     st.session_state.pop("uploaded_files", None)
