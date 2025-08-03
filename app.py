@@ -8,14 +8,38 @@ st.set_page_config(page_title="Garmin R10 Analyzer", layout="centered")
 st.title("Garmin R10 Multi-Session Analyzer")
 st.markdown("Upload your Garmin R10 CSV files below to get started. View full data or analyze summaries via the sidebar.")
 
-# CSS for compact tables
-st.markdown("""<style>.dataframe {font-size: small; overflow-x: auto;}</style>""", unsafe_allow_html=True)
+# CSS for compact tables and navigation styling
+st.markdown("""
+    <style>
+        .dataframe {font-size: small; overflow-x: auto;}
+        .stButton>button {background-color: #2ca02c; color: white; border-radius: 5px; margin: 2px;}
+        .stButton>button:hover {background-color: #228B22;}
+        .sidebar .sidebar-content {background-color: #f0f2f6; padding: 10px;}
+    </style>
+""", unsafe_allow_html=True)
 
-# Sidebar with descriptive labels
-st.sidebar.success("Navigate:")
-st.sidebar.markdown("- 🏠 Home (Upload CSVs)")
-st.sidebar.markdown("- 📋 Sessions Viewer")
-st.sidebar.markdown("- 📊 Dashboard")
+# Sidebar navigation with buttons
+st.sidebar.title("Navigation")
+pages = {
+    "🏠 Home (Upload CSVs)": "app.py",
+    "📋 Sessions Viewer": "pages/1_Sessions_Viewer.py",
+    "📊 Dashboard": "pages/0_dashboard.py"
+}
+
+# Determine current page for active styling
+current_page = st.session_state.get("current_page", "app.py")
+
+# Navigation buttons
+for label, page in pages.items():
+    if st.sidebar.button(label, key=page, help=f"Go to {label.split(' (')[0]} page"):
+        st.session_state["current_page"] = page
+        st.switch_page(page)
+
+# Conditional guidance based on data
+if 'df_all' not in st.session_state or st.session_state['df_all'].empty:
+    st.sidebar.warning("Upload data on the Home page to enable all features.")
+else:
+    st.sidebar.success("Data loaded. Explore sessions or dashboard!")
 
 # Sample CSV format
 st.markdown("""
@@ -32,7 +56,6 @@ def create_session_name(date_series):
     renamed_sessions = []
     for day, group in grouped:
         sorted_times = group.sort_values()
-        # Assign a single session per day unless multiple distinct sessions are needed
         renamed_sessions.extend([f"{day} Session 1"] * len(sorted_times))
     return renamed_sessions
 
@@ -43,7 +66,6 @@ if uploaded_files:
         dfs = []
         total_rows = 0
         for idx, file in enumerate(uploaded_files):
-            # Check file size (e.g., warn if >10MB)
             if file.size > 10 * 1024 * 1024:
                 st.warning(f"File {file.name} exceeds 10MB. Consider splitting large files.")
                 continue
@@ -57,12 +79,10 @@ if uploaded_files:
                     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
                 if 'Club Type' in df.columns:
                     df.rename(columns={'Club Type': 'Club', 'Carry Distance': 'Carry', 'Total Distance': 'Total'}, inplace=True)
-                    # Ensure numeric conversion after rename
                     df['Carry'] = pd.to_numeric(df['Carry'], errors='coerce')
                     df['Total'] = pd.to_numeric(df['Total'], errors='coerce')
                 dfs.append(df)
                 total_rows += len(df)
-                # Update progress
                 st.progress((idx + 1) / len(uploaded_files))
             except Exception as e:
                 st.error(f"Error processing {file.name}: {e}")
@@ -72,10 +92,8 @@ if uploaded_files:
         else:
             df_all = pd.concat(dfs, ignore_index=True)
             if 'Date' in df_all.columns:
-                # Drop rows with invalid/NaT dates (e.g., units row)
                 df_all = df_all.dropna(subset=['Date'])
                 df_all['Session'] = create_session_name(df_all['Date'])
-                # Debug: Show number of unique sessions
                 unique_sessions = df_all['Session'].nunique()
                 st.write(f"Debug: Number of unique sessions created: {unique_sessions}")
             st.session_state['df_all'] = df_all
@@ -87,7 +105,6 @@ if uploaded_files:
                 file_name="processed_r10_data.csv",
                 mime="text/csv"
             )
-            # Quick metric with type checking
             if 'Carry' in df_all.columns:
                 if df_all['Carry'].dtype == 'object':
                     st.warning("Carry column contains non-numeric data. Please check your CSV.")
@@ -95,16 +112,15 @@ if uploaded_files:
                     avg_carry = df_all['Carry'].mean().round(1)
                     st.metric("Average Carry (All Clubs)", f"{avg_carry} yards")
 
-# Clear data button
 if 'df_all' in st.session_state:
     if st.button("Clear Loaded Data"):
         del st.session_state['df_all']
         st.rerun()
 
-# Button to view full sessions with debug check
 if 'df_all' in st.session_state:
     if os.path.exists("pages/1_Sessions_Viewer.py"):
         if st.button("View Full Sessions"):
+            st.session_state["current_page"] = "pages/1_Sessions_Viewer.py"
             st.switch_page("pages/1_Sessions_Viewer.py")
     else:
         st.error("Page '1_Sessions_Viewer.py' not found. Please ensure the file exists in the pages/ directory.")
