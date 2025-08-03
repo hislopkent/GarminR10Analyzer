@@ -1,18 +1,10 @@
-
 services:
   - type: web
-    name: garmin-r10-analyzer
-    env: docker
-    repo: https://github.com/hislopkent/GarminR10Analyzer
+    name: GarminR10Analyzer
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.enableCORS false
     plan: free
-    healthCheckPath: /
     envVars:
-      - key: PORT
-        value: 8501
-      - key: OPENAI_API_KEY
-        fromEnv: OPENAI_API_KEY
-      - key: OPENAI_ASSISTANT_ID
-        fromEnv: OPENAI_ASSISTANT_ID
       - key: PASSWORD
-        fromEnv: PASSWORD
-    dockerCommand: streamlit run app.py --server.port $PORT --server.enableCORS false
+        sync: false
