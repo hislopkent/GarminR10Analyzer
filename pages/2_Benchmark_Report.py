@@ -6,27 +6,20 @@ output is a simple table of ✅/❌ ratings to highlight areas that may need
 attention.
 """
 
-import streamlit as st
-from utils.logger import logger
-
-uploaded_files = st.session_state.get("uploaded_files", [])
-if not uploaded_files:
-    st.warning("📤 Please upload CSV files on the home page first.")
-    st.stop()
-
-logger.info("📄 Page loaded: 2 Benchmark Report")
-
 import pandas as pd
+import streamlit as st
+
+from utils.logger import logger
 from utils.benchmarks import get_benchmarks
 from utils.data_utils import coerce_numeric
+from utils.page_utils import require_data
+
+logger.info("📄 Page loaded: Benchmark Report")
 
 st.title("✅ Benchmark Comparison Report")
 
-if "session_df" not in st.session_state or st.session_state["session_df"].empty:
-    st.info("Please upload session files from the Home page.")
-    st.stop()
-
-club_data = st.session_state["club_data"]
+df = require_data()
+club_data = {club: grp for club, grp in df.groupby("Club")}
 benchmarks = get_benchmarks()
 
 def compare_to_benchmark(club, club_df):

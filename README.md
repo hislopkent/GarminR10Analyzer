@@ -10,10 +10,10 @@ A Streamlit-based app for analyzing and improving your golf performance using da
 - Upload multiple Garmin R10 CSV files
 - Automatically groups data by session and club
 
-### 📊 Dashboard View
-- Aggregates club data (Carry, Smash Factor, Launch Angle, etc.)
-- Optional filters to remove outliers or poor contact shots
-- Interactive Plotly charts (Mean vs. Median vs. Std Dev)
+### 📈 Analysis Page
+- Overview tab summarises averages and consistency by club
+- Benchmarking tab explores dispersion and shot-level metrics
+- Interactive Plotly charts for carry distance and dispersion
 - Smart session and club filtering
 
 ### ✅ Benchmark Report (NEW)
@@ -21,13 +21,14 @@ A Streamlit-based app for analyzing and improving your golf performance using da
 - Per-club report cards with ✅ / ❌ ratings
 - Built-in feedback for practice priorities
 
-### 📝 Practice Log (NEW)
-- Track session notes and completed drills
-- Save logs locally and download as CSV
+### 📋 Sessions Page
+- Table viewer for raw shot data
+- Built-in practice log to capture notes and drills
+- Download logs as CSV
 
-### 🧠 AI Insights (Optional)
+### 🧠 AI Feedback (Optional)
 - Requires `OPENAI_API_KEY` and `OPENAI_ASSISTANT_ID` environment variables
-- Generates coaching-style analysis and per-club summaries
+- Club insight summaries and session-wide AI analysis
 
 ---
 
@@ -37,9 +38,10 @@ A Streamlit-based app for analyzing and improving your golf performance using da
 GarminR10Analyzer-main/
 ├── app.py                      # Main entry point (CSV uploads, session state)
 ├── pages/
-│   ├── 0_Dashboard.py          # Club averages + filters
-│   ├── 1_Sessions_Viewer.py    # Table viewer for all shots
-│   └── 2_Benchmark_Report.py   # 🔥 Benchmark coaching report
+│   ├── 0_Analysis.py           # Overview + benchmarking
+│   ├── 1_Sessions.py           # Viewer + practice log
+│   ├── 2_Benchmark_Report.py   # 🔥 Benchmark coaching report
+│   └── 3_AI_Feedback.py        # AI summaries and coaching
 ├── utils/
 │   └── benchmarks.py           # Performance goals and evaluator
 ├── requirements.txt            # Dependencies
@@ -95,7 +97,7 @@ Ensure your CSV contains these columns (from Garmin R10 export):
 
 ---
 ### 🔐 OpenAI API Key Setup
-To use the AI Insights feature, set your OpenAI API key as an environment variable:
+To use the AI Feedback feature, set your OpenAI API key as an environment variable:
 
 ```
 OPENAI_API_KEY=your_key_here
