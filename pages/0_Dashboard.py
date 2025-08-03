@@ -5,11 +5,14 @@ import openai
 import plotly.express as px
 import os
 
+from utils.sidebar import render_sidebar
+
 st.set_page_config(layout="centered")
 st.header("📊 Dashboard – Club Summary")
 
 # CSS for compact tables and improved layout
-st.markdown("""
+st.markdown(
+    """
     <style>
         .dataframe {font-size: small; overflow-x: auto; border: 1px solid #ddd; border-radius: 5px;}
         .sidebar .sidebar-content {background-color: #f0f2f6; padding: 10px;}
@@ -17,18 +20,14 @@ st.markdown("""
         .sidebar a:hover {background-color: #228B22; color: white; text-decoration: none; border-radius: 3px;}
         .stExpander > div {border: 1px solid #ddd; border-radius: 5px;}
     </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
-# Consistent sidebar navigation with single set of links
-st.sidebar.title("Navigation")
-st.sidebar.markdown("""
-- <a href="?" style="color: #2ca02c;">🏠 Home (Upload CSVs)</a>
-- <a href="?page=1_Sessions_Viewer" style="color: #2ca02c;">📋 Sessions Viewer</a>
-- <a href="?page=0_dashboard" style="color: #2ca02c;">📊 Dashboard</a>
-""", unsafe_allow_html=True)
+render_sidebar()
 
 # Conditional guidance
-if 'df_all' not in st.session_state or st.session_state['df_all'].empty:
+if "df_all" not in st.session_state or st.session_state["df_all"].empty:
     st.sidebar.warning("Upload data to enable all features.")
 else:
     st.sidebar.success("Data loaded. Explore sessions or dashboard!")
