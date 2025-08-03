@@ -48,3 +48,28 @@ def test_poor_launch_angle():
     recs = recommend_drills(df)
     issues = [r.issue for r in recs['7 Iron']]
     assert "Poor launch angle" in issues
+
+
+def test_high_launch_wedge():
+    df = pd.DataFrame({
+        'Club Type': ['PW', 'PW'],
+        'Carry Distance': [100, 101],
+        'Smash Factor': [1.26, 1.27],
+        'Launch Angle': [45, 46],
+    })
+    recs = recommend_drills(df)
+    issues = [r.issue for r in recs['PW']]
+    assert "Launch angle too high with wedge" in issues
+
+
+def test_excessive_wedge_backspin():
+    df = pd.DataFrame({
+        'Club Type': ['PW', 'PW'],
+        'Carry Distance': [100, 102],
+        'Smash Factor': [1.26, 1.27],
+        'Launch Angle': [30, 31],
+        'Backspin': [12000, 12500],
+    })
+    recs = recommend_drills(df)
+    issues = [r.issue for r in recs['PW']]
+    assert "Excessive wedge backspin" in issues
