@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import os
 
 st.set_page_config(page_title="Garmin R10 Analyzer", layout="centered")
 st.title("Garmin R10 Multi-Session Analyzer")
@@ -31,8 +32,8 @@ def create_session_name(date_series):
     renamed_sessions = []
     for day, group in grouped:
         sorted_times = group.sort_values()
-        for idx, timestamp in enumerate(sorted_times):
-            renamed_sessions.append(f"{day} Session {idx+1}")
+        # Assign a single session per day unless multiple distinct sessions are needed
+        renamed_sessions.extend([f"{day} Session 1"] * len(sorted_times))
     return renamed_sessions
 
 uploaded_files = st.file_uploader("Upload Garmin R10 CSV files", type="csv", accept_multiple_files=True)
@@ -74,6 +75,9 @@ if uploaded_files:
                 # Drop rows with invalid/NaT dates (e.g., units row)
                 df_all = df_all.dropna(subset=['Date'])
                 df_all['Session'] = create_session_name(df_all['Date'])
+                # Debug: Show number of unique sessions
+                unique_sessions = df_all['Session'].nunique()
+                st.write(f"Debug: Number of unique sessions created: {unique_sessions}")
             st.session_state['df_all'] = df_all
             st.success(f"✅ Loaded {total_rows} shots from {len(dfs)} file(s).")
             st.dataframe(df_all.head(100), use_container_width=True)
@@ -97,9 +101,12 @@ if 'df_all' in st.session_state:
         del st.session_state['df_all']
         st.rerun()
 
-# Button to view full sessions
+# Button to view full sessions with debug check
 if 'df_all' in st.session_state:
-    if st.button("View Full Sessions"):
-        st.switch_page("pages/1_Sessions_Viewer.py")
+    if os.path.exists("pages/1_Sessions_Viewer.py"):
+        if st.button("View Full Sessions"):
+            st.switch_page("pages/1_Sessions_Viewer.py")
+    else:
+        st.error("Page '1_Sessions_Viewer.py' not found. Please ensure the file exists in the pages/ directory.")
 else:
     st.info("Upload one or more Garmin R10 CSV files to begin.")
