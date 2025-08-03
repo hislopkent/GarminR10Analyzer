@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import openai
 import plotly.express as px
+import os
 
 st.set_page_config(layout="centered")
 st.header("📊 Dashboard – Club Summary")
@@ -10,20 +11,20 @@ st.header("📊 Dashboard – Club Summary")
 # CSS for compact tables and improved layout
 st.markdown("""
     <style>
-        .dataframe {font-size: small; overflow-x: auto;}
+        .dataframe {font-size: small; overflow-x: auto; border: 1px solid #ddd; border-radius: 5px;}
         .sidebar .sidebar-content {background-color: #f0f2f6; padding: 10px;}
-        .sidebar a {color: #2ca02c; text-decoration: none;}
-        .sidebar a:hover {background-color: #228B22; text-decoration: underline;}
+        .sidebar a {color: #2ca02c; text-decoration: none; display: block; padding: 5px;}
+        .sidebar a:hover {background-color: #228B22; color: white; text-decoration: none; border-radius: 3px;}
         .stExpander > div {border: 1px solid #ddd; border-radius: 5px;}
     </style>
 """, unsafe_allow_html=True)
 
-# Consistent sidebar navigation with links
+# Consistent sidebar navigation with single set of links
 st.sidebar.title("Navigation")
 st.sidebar.markdown("""
-- [🏠 Home (Upload CSVs)](/)
-- [📋 Sessions Viewer](/1_Sessions_Viewer)
-- [📊 Dashboard](/0_dashboard)
+- <a href="?" style="color: #2ca02c;">🏠 Home (Upload CSVs)</a>
+- <a href="?page=1_Sessions_Viewer" style="color: #2ca02c;">📋 Sessions Viewer</a>
+- <a href="?page=0_dashboard" style="color: #2ca02c;">📊 Dashboard</a>
 """, unsafe_allow_html=True)
 
 # Conditional guidance
@@ -70,7 +71,7 @@ else:
                 return filtered_group if not filtered_group.empty else group
             
             filtered = filtered.groupby('Club').apply(remove_carry_outliers).reset_index(drop=True)
-            st.info("Outliers removed using IQR on Carry distance per club (e.g., excluding poor shots like 100-yard drivers).")
+            st.info("Outliers removed using IQR on Carry distance per club.")
         
         if remove_contact_outliers:
             def is_poor_contact(row):
@@ -90,7 +91,7 @@ else:
                     return False
             
             filtered = filtered[~filtered.apply(is_poor_contact, axis=1)]
-            st.info("Fat/thin shots removed using thresholds on Smash Factor (poor contact), Launch Angle (high/low), Backspin (extreme), and Attack Angle (too negative for fat). Thresholds are club-specific.")
+            st.info("Fat/thin shots removed using thresholds on Smash Factor, Launch Angle, Backspin, and Attack Angle.")
 
     @st.cache_data
     def compute_grouped(filtered):
@@ -105,19 +106,26 @@ else:
     # Styled table with tooltips and reduced decimals
     def highlight_metrics(s):
         color = 'white'
+        tooltip = ''
         if s.name == 'Carry_mean':
-            return ['background-color: red' if v < 200 else 'background-color: green' for v in s]
+            tooltip = "Target: >220 yds (Driver), >150 yds (7 Iron)"
+            return ['background-color: red' if v < 150 else 'background-color: green' for v in s]
         elif s.name == 'Sidespin_mean':
+            tooltip = "Target: <500 rpm for consistency"
             return ['background-color: red' if abs(v) > 500 else 'background-color: green' for v in s]
         elif s.name == 'Smash Factor_mean':
+            tooltip = "Target: >1.45 (Driver), >1.3 (Irons)"
             return ['background-color: red' if v < 1.3 else 'background-color: green' for v in s]
         elif s.name == 'Launch Angle_mean':
-            return ['background-color: red' if v < 10 or v > 20 else 'background-color: green' for v in s]
+            tooltip = "Target: 10-16° (Driver), 15-20° (7 Iron)"
+            return ['background-color: red' if (v < 10 or v > 16) if 'Driver' in s.index else (v < 15 or v > 20) else 'background-color: green' for v in s]
         elif s.name == 'Apex Height_mean':
-            return ['background-color: red' if v < 20 or v > 40 else 'background-color: green' for v in s]
+            tooltip = "Target: 30-40 ft (Driver), 60-90 ft (Irons)"
+            return ['background-color: red' if v < 30 or v > 40 else 'background-color: green' for v in s]
         elif s.name == 'Backspin_mean':
-            return ['background-color: red' if v < 2000 or v > 8000 else 'background-color: green' for v in s]
-        return [f'background-color: {color}' for _ in s]
+            tooltip = "Target: 1500-3500 rpm (Driver), 5000-7000 rpm (7 Iron)"
+            return ['background-color: red' if v < 1500 or v > 3500 else 'background-color: green' for v in s]
+        return [f'background-color: {color}; title: "{tooltip}"' for _ in s]
 
     styled_table = grouped_flat.style.apply(highlight_metrics, subset=[f'{metric}_mean' for metric in ['Carry', 'Sidespin', 'Smash Factor', 'Launch Angle', 'Apex Height', 'Backspin']])
     styled_table = styled_table.format("{:.1f}")  # Reduce decimals to 1
@@ -128,9 +136,24 @@ else:
         for club in grouped_flat['Club']:
             club_data = grouped_flat[grouped_flat['Club'] == club].iloc[0]
             carry_mean = club_data['Carry_mean']
-            st.metric(f"Avg Carry ({club})", f"{carry_mean:.1f} yds", 
-                     delta=f"{'🟢' if carry_mean >= 220 else '🟠'} {220 - carry_mean:.1f} yds to benchmark" if 'Driver' in club else 
-                           f"{'🟢' if carry_mean >= 150 else '🟠'} {150 - carry_mean:.1f} yds to benchmark" if '7 Iron' in club else "",
+            smash_mean = club_data['Smash Factor_mean']
+            launch_mean = club_data['Launch Angle_mean']
+            backspin_mean = club_data['Backspin_mean']
+            st.metric(f"Carry ({club})", f"{carry_mean:.1f} yds", 
+                     delta=f"{'🟢' if carry_mean >= 220 else '🟠'} {max(0, 220 - carry_mean):.1f} yds to 220" if 'Driver' in club else 
+                           f"{'🟢' if carry_mean >= 150 else '🟠'} {max(0, 150 - carry_mean):.1f} yds to 150" if '7 Iron' in club else "",
+                     delta_color="inverse")
+            st.metric(f"Smash Factor ({club})", f"{smash_mean:.1f}", 
+                     delta=f"{'🟢' if smash_mean >= 1.45 else '🟠'} {max(0, 1.45 - smash_mean):.1f} to 1.45" if 'Driver' in club else 
+                           f"{'🟢' if smash_mean >= 1.3 else '🟠'} {max(0, 1.3 - smash_mean):.1f} to 1.3" if 'Iron' in club else "",
+                     delta_color="inverse")
+            st.metric(f"Launch Angle ({club})", f"{launch_mean:.1f}°", 
+                     delta=f"{'🟢' if 10 <= launch_mean <= 16 else '🟠'} {min(abs(10 - launch_mean), abs(16 - launch_mean)):.1f}° to 10-16°" if 'Driver' in club else 
+                           f"{'🟢' if 15 <= launch_mean <= 20 else '🟠'} {min(abs(15 - launch_mean), abs(20 - launch_mean)):.1f}° to 15-20°" if '7 Iron' in club else "",
+                     delta_color="inverse")
+            st.metric(f"Backspin ({club})", f"{backspin_mean:.1f} rpm", 
+                     delta=f"{'🟢' if 1500 <= backspin_mean <= 3500 else '🟠'} {min(abs(1500 - backspin_mean), abs(3500 - backspin_mean)):.1f} rpm to 1500-3500" if 'Driver' in club else 
+                           f"{'🟢' if 5000 <= backspin_mean <= 7000 else '🟠'} {min(abs(5000 - backspin_mean), abs(7000 - backspin_mean)):.1f} rpm to 5000-7000" if '7 Iron' in club else "",
                      delta_color="inverse")
 
     st.markdown("""
@@ -157,35 +180,37 @@ else:
 
     with st.expander("💡 Show AI Suggestions", expanded=False):
         st.subheader("AI Insights")
-        focus = st.text_input("AI Focus (e.g., 'irons only' or 'distance improvement')", "")
-        api_key = os.environ.get("OPENAI_API_KEY")
-        assistant_id = os.environ.get("ASSISTANT_ID")
-        if not api_key or not assistant_id:
-            st.warning("OpenAI API Key or Assistant ID not set in Render environment variables. Set OPENAI_API_KEY and ASSISTANT_ID in your Render dashboard.")
-        elif st.button("Generate AI Insights"):
-            try:
-                client = openai.OpenAI(api_key=api_key)
-                thread = client.beta.threads.create()
-                data_str = filtered.to_string() if len(filtered) < 200 else filtered.sample(200).to_string()
-                prompt = f"Full filtered shot data:\n{data_str}\nAggregated averages per club (mean, median, std for Carry, Backspin, Sidespin, Total, Smash Factor, Apex Height, Launch Angle, Attack Angle):\n{grouped.to_string()}\nCompare each club’s average to common benchmarks for a 15–20 handicap player (e.g., Driver Carry >220 yds, Smash Factor >1.45, Launch Angle 10-16°; 7 Iron Carry >150 yds, Smash Factor >1.3, Launch Angle 15-20°). Provide per-club suggestions, comments, and recommendations for improving performance. Focus on {focus if focus else 'general'} aspects like fat/thin shots (low Smash Factor, extreme Launch Angle/Backspin), outliers, consistency, and typical golf benchmarks."
-                message = client.beta.threads.messages.create(
-                    thread_id=thread.id,
-                    role="user",
-                    content=prompt
-                )
-                run = client.beta.threads.runs.create(
-                    thread_id=thread.id,
-                    assistant_id=assistant_id
-                )
-                import time
-                while run.status != "completed":
-                    time.sleep(1)
-                    run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
-                messages = client.beta.threads.messages.list(thread_id=thread.id)
-                insights = messages.data[0].content[0].text.value
-                st.write(insights)
-            except Exception as e:
-                st.error(f"Error generating insights: {str(e)}. Check environment variables or try again. If quota exceeded, upgrade your OpenAI plan at https://platform.openai.com/account/billing or wait for reset.")
+        enable_ai = st.checkbox("Enable AI Insights")
+        if enable_ai:
+            focus = st.text_input("AI Focus (e.g., 'irons only' or 'distance improvement')", "")
+            api_key = os.environ.get("OPENAI_API_KEY")
+            assistant_id = os.environ.get("ASSISTANT_ID")
+            if not api_key or not assistant_id:
+                st.warning("OpenAI API Key or Assistant ID not set in Render environment variables. Set OPENAI_API_KEY and ASSISTANT_ID in your Render dashboard.")
+            elif st.button("Generate AI Insights"):
+                try:
+                    client = openai.OpenAI(api_key=api_key)
+                    thread = client.beta.threads.create()
+                    data_str = filtered.to_string() if len(filtered) < 200 else filtered.sample(200).to_string()
+                    prompt = f"Full filtered shot data:\n{data_str}\nAggregated averages per club (mean, median, std for Carry, Backspin, Sidespin, Total, Smash Factor, Apex Height, Launch Angle, Attack Angle):\n{grouped.to_string()}\nCompare each club’s average to common benchmarks for a 15–20 handicap player (e.g., Driver Carry >220 yds, Smash Factor >1.45, Launch Angle 10-16°; 7 Iron Carry >150 yds, Smash Factor >1.3, Launch Angle 15-20°). Provide per-club suggestions, comments, and recommendations for improving performance. Focus on {focus if focus else 'general'} aspects like fat/thin shots (low Smash Factor, extreme Launch Angle/Backspin), outliers, consistency, and typical golf benchmarks."
+                    message = client.beta.threads.messages.create(
+                        thread_id=thread.id,
+                        role="user",
+                        content=prompt
+                    )
+                    run = client.beta.threads.runs.create(
+                        thread_id=thread.id,
+                        assistant_id=assistant_id
+                    )
+                    import time
+                    while run.status != "completed":
+                        time.sleep(1)
+                        run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+                    messages = client.beta.threads.messages.list(thread_id=thread.id)
+                    insights = messages.data[0].content[0].text.value
+                    st.write(insights)
+                except Exception as e:
+                    st.error(f"Error generating insights: {str(e)}. Check environment variables or try again. If quota exceeded, upgrade your OpenAI plan at https://platform.openai.com/account/billing or wait for reset.")
 
     with st.expander("📌 Benchmark Insights"):
         st.subheader("Reference Benchmarks (Jon Sherman Style)")
