@@ -98,6 +98,13 @@ else:
     
     st.dataframe(grouped_flat, use_container_width=True)
     
+    st.download_button(
+        label="Download Dashboard Stats",
+        data=grouped_flat.to_csv(index=False),
+        file_name="dashboard_stats.csv",
+        mime="text/csv"
+    )
+    
     st.markdown("""
     ### Statistic Explanations
     - **Mean**: <span title="Average performance; e.g., mean Carry shows typical distance—aim to increase for better range.">The average value</span>.
@@ -118,18 +125,32 @@ else:
         st.plotly_chart(fig, use_container_width=True)
     
     st.subheader("AI Insights")
+    focus = st.text_input("AI Focus (e.g., 'irons only' or 'distance improvement')", "")
     api_key = st.text_input("Enter OpenAI API Key", type="password")
-    if api_key and st.button("Generate AI Insights"):
+    assistant_id = st.text_input("Enter Golf Pro Assistant ID", type="password", help="Get this from https://platform.openai.com/assistants")
+    if api_key and assistant_id and st.button("Generate AI Insights"):
         try:
             client = openai.OpenAI(api_key=api_key)
-            prompt = f"Based on these golf shot averages per club (mean, median, std for Carry, Backspin, Sidespin, Total, Smash Factor, Apex Height, Launch Angle, Attack Angle):\n{grouped.to_string()}\nProvide suggestions, comments, and recommendations for improving performance. Focus on fat/thin shots (low Smash Factor, extreme Launch Angle/Backspin), outliers, consistency, and typical golf benchmarks (e.g., driver carry >200 yards, irons Smash Factor >1.3)."
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "system", "content": "You are a golf performance analyst."}, {"role": "user", "content": prompt}]
+            thread = client.beta.threads.create()
+            # Send a sample of filtered data (e.g., first 10 rows) along with grouped stats
+            sample_data = filtered.head(10).to_string()
+            message = client.beta.threads.messages.create(
+                thread_id=thread.id,
+                role="user",
+                content=f"Raw shot data sample:\n{sample_data}\nAggregated averages per club (mean, median, std for Carry, Backspin, Sidespin, Total, Smash Factor, Apex Height, Launch Angle, Attack Angle):\n{grouped.to_string()}\nProvide suggestions, comments, and recommendations for improving performance. Focus on {focus if focus else 'general'} aspects like fat/thin shots (low Smash Factor, extreme Launch Angle/Backspin), outliers, consistency, and typical golf benchmarks (e.g., driver carry >200 yards, irons Smash Factor >1.3), based on the actual values in the raw data and the aggregated stats."
             )
-            insights = response.choices[0].message.content
+            run = client.beta.threads.runs.create(
+                thread_id=thread.id,
+                assistant_id=assistant_id
+            )
+            import time
+            while run.status != "completed":
+                time.sleep(1)
+                run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+            messages = client.beta.threads.messages.list(thread_id=thread.id)
+            insights = messages.data[0].content[0].text.value
             st.write(insights)
         except Exception as e:
-            st.error(f"Error generating insights: {str(e)}. Check your API key or try again. If quota exceeded, upgrade your OpenAI plan at https://platform.openai.com/account/billing or wait for reset.")
-    elif not api_key:
-        st.info("Enter your OpenAI API key above to generate AI-powered suggestions on your data (e.g., 'Improve driver smash factor for better distance'). Get a key at openai.com.")
+            st.error(f"Error generating insights: {str(e)}. Check your API key, Assistant ID, or try again. If quota exceeded, upgrade your OpenAI plan at https://platform.openai.com/account/billing or wait for reset.")
+    elif not api_key or not assistant_id:
+        st.info("Enter your OpenAI API key and Golf Pro Assistant ID above to generate AI-powered suggestions on your data (e.g., 'Improve driver smash factor for better distance'). Get keys at openai.com.")
