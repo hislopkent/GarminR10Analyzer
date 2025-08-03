@@ -63,6 +63,29 @@ if df_filtered.empty:
     st.warning("No sessions selected.")
     st.stop()
 
+df_filtered = df_filtered.copy()
+
+# Ensure a consistent club column name
+if "Club" not in df_filtered.columns:
+    if "Club Type" in df_filtered.columns:
+        df_filtered["Club"] = df_filtered["Club Type"]
+    else:
+        st.error(
+            "❌ The uploaded data does not contain a 'Club' column. Please check your CSV files."
+        )
+        st.stop()
+
+st.sidebar.markdown("### Club Filter")
+club_options = sorted(df_filtered["Club"].dropna().unique())
+selected_clubs = st.sidebar.multiselect("Select club(s)", club_options, default=club_options)
+
+if not selected_clubs:
+    st.warning("No clubs selected.")
+    st.stop()
+
+df_filtered = df_filtered[df_filtered["Club"].isin(selected_clubs)]
+club_list = sorted(df_filtered["Club"].dropna().unique())
+
 # Display key metrics for the filtered sessions
 st.subheader("Key Metrics")
 
@@ -114,19 +137,27 @@ col4.metric(
 )
 
 df = df_filtered.copy()
-
-# Ensure a consistent club column name
-if "Club" not in df.columns:
-    if "Club Type" in df.columns:
-        df["Club"] = df["Club Type"]
-    else:
-        st.error(
-            "❌ The uploaded data does not contain a 'Club' column. Please check your CSV files."
+st.subheader("Shot Dispersion")
+if "Offline" in df.columns:
+    carry_col = "Carry Distance" if "Carry Distance" in df.columns else "Carry"
+    if carry_col in df.columns:
+        df["Offline"] = pd.to_numeric(df["Offline"], errors="coerce")
+        df[carry_col] = pd.to_numeric(df[carry_col], errors="coerce")
+        hover_cols = ["Date", "Club"] if "Date" in df.columns else ["Club"]
+        fig_dispersion = px.scatter(
+            df,
+            x="Offline",
+            y=carry_col,
+            color="Club",
+            hover_data=hover_cols,
+            title="Lateral Dispersion vs Carry Distance",
         )
-        st.stop()
+        st.plotly_chart(fig_dispersion, use_container_width=True)
+    else:
+        st.warning("No carry distance data available for dispersion plot.")
+else:
+    st.warning("No 'Offline' column available for dispersion plot.")
 
-# Sidebar club selection
-club_list = sorted(df["Club"].dropna().unique())
 selected_club = st.sidebar.selectbox("Select a club to view", club_list)
 
 club_data = df[df["Club"] == selected_club]
