@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import openai
-import plotly.express as px  # Assuming Plotly from previous suggestions
+import plotly.express as px
 
 st.set_page_config(layout="centered")
 st.header("📊 Dashboard – Club Summary")
@@ -98,33 +98,22 @@ else:
     
     st.markdown("""
     ### Statistic Explanations
-    - **Mean**: The average value, representing your typical performance across shots (e.g., mean Carry is your average distance).
-    - **Median**: The middle value, ignoring extreme outliers (e.g., poor shots); useful for consistent performance assessment.
-    - **Std (Standard Deviation)**: Measures variability; lower values indicate more consistent shots (e.g., low Carry std means reliable distance).
-    """)
+    - **Mean**: <span title="Average performance; e.g., mean Carry shows typical distance—aim to increase for better range.">The average value</span>.
+    - **Median**: <span title="Middle value, less affected by poor shots; compare to mean to spot extremes.">The middle value</span>.
+    - **Std**: <span title="Variability; low std = consistent shots (e.g., Carry std <10 yards is tight grouping).">Measures spread</span>.
+    """, unsafe_allow_html=True)
     
     if not grouped_flat.empty:
-        chart_data = grouped_flat[['Club', 'Carry_mean', 'Carry_median', 'Carry_std']]
-        chart_data = chart_data.melt(id_vars=['Club'], value_vars=['Carry_mean', 'Carry_median'], var_name='Stat', value_name='Value')
-        chart_data['Std'] = chart_data.apply(lambda row: grouped_flat.loc[grouped_flat['Club'] == row['Club'], 'Carry_std'].values[0] if row['Stat'] == 'Carry_mean' else 0, axis=1)
-        chart_data['Lower'] = chart_data['Value'] - chart_data['Std']
-        chart_data['Upper'] = chart_data['Value'] + chart_data['Std']
-
-        bar = alt.Chart(chart_data).mark_bar().encode(
-            x='Club:O',
-            y='Value:Q',
-            color='Stat:N',
-            tooltip=['Club', 'Stat', 'Value', 'Std']
-        ).properties(title='Carry Distance: Mean and Median with Std Deviation')
-
-        error = alt.Chart(chart_data[chart_data['Stat'] == 'Carry_mean']).mark_errorbar(color='black').encode(
-            x='Club:O',
-            y='Lower:Q',
-            y2='Upper:Q'
-        )
-
-        chart = (bar + error).interactive()
-        st.altair_chart(chart, use_container_width=True)
+        metric = st.selectbox("Select Metric for Chart", numeric_cols, index=0)
+        chart_data = grouped_flat[['Club', f'{metric}_mean', f'{metric}_median', f'{metric}_std']]
+        chart_data = chart_data.melt(id_vars=['Club'], value_vars=[f'{metric}_mean', f'{metric}_median'], var_name='Stat', value_name='Value')
+        chart_data['Std'] = chart_data.apply(lambda row: grouped_flat.loc[grouped_flat['Club'] == row['Club'], f'{metric}_std'].values[0] if row['Stat'] == f'{metric}_mean' else 0, axis=1)
+        
+        fig = px.bar(chart_data, x='Club', y='Value', color='Stat', barmode='group',
+                     error_y='Std' if 'Std' in chart_data.columns else None,
+                     title=f'{metric}: Mean and Median with Std Deviation')
+        fig.update_layout(yaxis_title=metric, hovermode="x")
+        st.plotly_chart(fig, use_container_width=True)
     
     st.subheader("AI Insights")
     api_key = st.text_input("Enter OpenAI API Key", type="password")
