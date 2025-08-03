@@ -1,4 +1,18 @@
 import streamlit as st
+import streamlit as st
+PASSWORD = st.secrets.get("app_password") or "demo123"
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+if not st.session_state["authenticated"]:
+    st.title("🔒 Protected App")
+    password = st.text_input("Enter password:", type="password")
+    if password == PASSWORD:
+        st.session_state["authenticated"] = True
+        st.experimental_rerun()
+    elif password:
+        st.error("❌ Incorrect password")
+    st.stop()
+
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -92,7 +106,7 @@ if uploaded_files:
             st.error(f"❌ Failed to load {file.name}: {e}")
 
 
-                            session_date = valid_dates.iloc[0]
+            session_date = valid_dates.iloc[0]
                         else:
                             session_date = datetime.now().date()
                         session_counts[session_date] = session_counts.get(session_date, 0) + 1
@@ -120,7 +134,7 @@ if uploaded_files:
                     st.error(f"Failed to process {file.name}: {e}")
                     st.text("First 10 lines of the file for debugging:")
                     st.code(preview_text)
-            
+
             if not dfs:
                 st.error("No valid CSVs loaded. Please check your files and try again.")
             else:
