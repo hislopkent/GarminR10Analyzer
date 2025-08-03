@@ -149,8 +149,24 @@ else:
             return ['background-color: red' if v < 1500 or v > 3500 else 'background-color: green' for v in s]
         return [f'background-color: {color}; title: "{tooltip}"' for _ in s]
 
-    styled_table = grouped_flat.style.apply(highlight_metrics, subset=[f'{metric}_mean' for metric in ['Carry', 'Sidespin', 'Smash Factor', 'Launch Angle', 'Apex Height', 'Backspin']])
-    styled_table = styled_table.format("{:.1f}")  # Reduce decimals to 1
+    styled_table = grouped_flat.style.apply(
+        highlight_metrics,
+        subset=[
+            f"{metric}_mean" for metric in [
+                "Carry",
+                "Sidespin",
+                "Smash Factor",
+                "Launch Angle",
+                "Apex Height",
+                "Backspin",
+            ]
+        ],
+    )
+
+    # Only format numeric columns to avoid ValueError on string columns like 'Club'
+    numeric_columns = grouped_flat.select_dtypes(include="number").columns
+    format_dict = {col: "{:.1f}" for col in numeric_columns}
+    styled_table = styled_table.format(format_dict)  # Reduce decimals to 1
     st.dataframe(styled_table, use_container_width=True)
 
     # Summary Metrics
