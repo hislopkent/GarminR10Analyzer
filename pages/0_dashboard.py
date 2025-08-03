@@ -18,7 +18,7 @@ if df_all is None or df_all.empty:
         st.switch_page("app.py")
 else:
     st.subheader("Averages per Club")
-    numeric_cols = ['Carry', 'Backspin', 'Sidespin', 'Total', 'Smash Factor', 'Apex Height']
+    numeric_cols = ['Carry', 'Backspin', 'Sidespin', 'Total', 'Smash Factor', 'Apex Height', 'Launch Angle', 'Attack Angle']  # Added Launch Angle and Attack Angle
     df_all = df_all.copy()
     
     # Convert all numeric columns to numeric, coercing errors to NaN
@@ -39,21 +39,44 @@ else:
         st.warning("One or more numeric columns contain non-numeric data. Aggregates may be incomplete.")
         st.write("Column dtypes:", filtered[numeric_cols].dtypes)
     
-    # Outlier removal option
-    remove_outliers = st.checkbox("Remove Outliers (based on Carry IQR per club)", value=False)
-    if remove_outliers:
+    # Outlier removal options
+    remove_outliers_iqr = st.checkbox("Remove Outliers (based on Carry IQR per club)", value=False)
+    remove_contact_outliers = st.checkbox("Remove Fat/Thin Shots (based on Smash Factor, Launch Angle, Backspin, Attack Angle)", value=False)
+    
+    if remove_outliers_iqr:
         def remove_carry_outliers(group):
-            if len(group) < 3:  # Need at least 3 shots
+            if len(group) < 3:
                 return group
             Q1 = group['Carry'].quantile(0.25)
             Q3 = group['Carry'].quantile(0.75)
             IQR = Q3 - Q1
             filtered_group = group[(group['Carry'] >= Q1 - 1.5 * IQR) & (group['Carry'] <= Q3 + 1.5 * IQR)]
-            return filtered_group if not filtered_group.empty else group  # Return original if all filtered
+            return filtered_group if not filtered_group.empty else group
         
         filtered = filtered.groupby('Club').apply(remove_carry_outliers).reset_index(drop=True)
         st.info("Outliers removed using IQR on Carry distance per club (e.g., excluding poor shots like 100-yard drivers).")
     
+    if remove_contact_outliers:
+        # Club-specific thresholds for fat/thin detection
+        def is_poor_contact(row):
+            club = row['Club']
+            smash = row['Smash Factor']
+            launch = row['Launch Angle']
+            backspin = row['Backspin']
+            attack = row['Attack Angle']
+            
+            if 'Driver' in club:
+                return smash < 1.4 or launch < 8 or launch > 16 or backspin < 1500 or backspin > 3500 or attack < -2 or attack > 5
+            elif 'Iron' in club:
+                return smash < 1.3 or launch < 10 or launch > 22 or backspin < 4000 or backspin > 9000 or attack < -5 or attack > 0
+            elif 'Wedge' in club:
+                return smash < 1.2 or launch < 25 or launch > 45 or backspin < 6000 or backspin > 12000 or attack < -6 or attack > -2
+            else:
+                return False  # Default: no removal for unknown clubs
+        
+        filtered = filtered[~filtered.apply(is_poor_contact, axis=1)]
+        st.info("Fat/thin shots removed using thresholds on Smash Factor (poor contact), Launch Angle (high/low), Backspin (extreme), and Attack Angle (too negative for fat). Thresholds are club-specific.")
+
     # Aggregate
     grouped = filtered.groupby('Club')[numeric_cols].agg(['mean', 'median', 'std']).round(1)
     
@@ -67,7 +90,7 @@ else:
     # Explanations for statistics
     st.markdown("""
     ### Statistic Explanations
-    - **Mean**: The average value, representing your overall performance across shots (e.g., mean Carry is your typical distance).
+    - **Mean**: The average value, representing your typical performance across shots (e.g., mean Carry is your average distance).
     - **Median**: The middle value, ignoring extreme outliers (e.g., poor shots); useful for consistent performance assessment.
     - **Std (Standard Deviation)**: Measures variability; lower values indicate more consistent shots (e.g., low Carry std means reliable distance).
     """)
@@ -105,7 +128,7 @@ else:
     if api_key and st.button("Generate AI Insights"):
         try:
             client = openai.OpenAI(api_key=api_key)
-            prompt = f"Based on these golf shot averages per club (mean, median, std for Carry, Backspin, Sidespin, Total, Smash Factor, Apex Height):\n{grouped.to_string()}\nProvide suggestions, comments, and recommendations for improving performance. Focus on outliers, consistency, and typical golf benchmarks (e.g., driver carry >200 yards)."
+            prompt = f"Based on these golf shot averages per club (mean, median, std for Carry, Backspin, Sidespin, Total, Smash Factor, Apex Height, Launch Angle, Attack Angle):\n{grouped.to_string()}\nProvide suggestions, comments, and recommendations for improving performance. Focus on fat/thin shots (low Smash Factor, extreme Launch Angle/Backspin), outliers, consistency, and typical golf benchmarks (e.g., driver carry >200 yards, irons Smash Factor >1.3)."
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "system", "content": "You are a golf performance analyst."}, {"role": "user", "content": prompt}]
