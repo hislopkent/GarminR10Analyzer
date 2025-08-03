@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
-from utils.benchmarks import check_benchmark
 
+from utils.benchmarks import check_benchmark
 from utils.sidebar import render_sidebar
 from utils.ai_feedback import generate_ai_summary
+
 
 st.set_page_config(layout="centered")
 st.header("📌 Benchmark Report – Club Performance vs. Goals")
@@ -30,34 +31,89 @@ else:
             df_all[col] = pd.to_numeric(df_all[col], errors="coerce")
     df_all = df_all.dropna(subset=["Club"] + numeric_cols, how="any")
 
-    sessions = st.multiselect("Select Sessions", df_all["Session"].unique(), default=df_all["Session"].unique())
-    clubs = st.multiselect("Select Clubs", df_all["Club"].unique(), default=df_all["Club"].unique())
+    sessions = st.multiselect(
+        "Select Sessions", df_all["Session"].unique(), default=df_all["Session"].unique()
+    )
+    clubs = st.multiselect(
+        "Select Clubs", df_all["Club"].unique(), default=df_all["Club"].unique()
+    )
     filtered = df_all[df_all["Session"].isin(sessions) & df_all["Club"].isin(clubs)]
 
     if filtered.empty:
         st.info("No data found with the current filters.")
     else:
         st.subheader("✅ Benchmark Comparison Results")
-        show_ai_feedback = st.checkbox("\U0001F4A1 Show AI Summary Under Each Club", value=False)
-        if show_ai_feedback:
-            st.info("Generating personalized feedback per club based on your session data...")
 
-        grouped = filtered.groupby("Club")[numeric_cols].mean().round(1).reset_index()
+        # persist AI feedback between reruns
+        if "ai_feedback" not in st.session_state:
+            st.session_state["ai_feedback"] = {}
 
-        cols = st.columns(3)
-        for idx, row in grouped.iterrows():
-            with cols[idx % 3]:
-                club_name = row["Club"]
-                st.markdown(f"### {club_name}")
-                result_lines = check_benchmark(club_name, row)
-                for line in result_lines:
-                    st.write(f"- {line}")
-                if show_ai_feedback:
-                    with st.spinner(f"Analyzing {club_name}..."):
-                        feedback = generate_ai_summary(club_name, filtered)
-                        st.markdown(f"**AI Feedback:**\n\n> {feedback}")
+        grouped = (
+            filtered.groupby("Club")[numeric_cols].mean().round(1).reset_index()
+        )
+
+        generate_clicked = st.button("Generate All Feedback")
+
+        @st.cache_data
+        def build_benchmark_table(grouped_df):
+            records = []
+            for _, row in grouped_df.iterrows():
+                club = row["Club"]
+                lines = check_benchmark(club, row)
+                record = {"Club": club}
+                for line in lines:
+                    if ": " not in line:
+                        continue
+                    metric, result = line.split(": ", 1)
+                    record[metric] = result
+                records.append(record)
+            return pd.DataFrame(records).set_index("Club")
+
+        table_df = build_benchmark_table(grouped)
+
+        def color_result(val):
+            if isinstance(val, str):
+                if val.startswith("✅"):
+                    return "background-color:#d4edda"
+                if val.startswith("❌"):
+                    return "background-color:#f8d7da"
+            return ""
+
+        st.dataframe(
+            table_df.style.applymap(color_result), use_container_width=True
+        )
+
+        if generate_clicked:
+            for club in grouped["Club"]:
+                if club not in st.session_state["ai_feedback"]:
+                    with st.spinner(f"Analyzing {club}..."):
+                        st.session_state["ai_feedback"][club] = generate_ai_summary(
+                            club, filtered
+                        )
+
+        for club in grouped["Club"]:
+            with st.expander(f"🧠 {club} Feedback"):
+                feedback = st.session_state["ai_feedback"].get(club)
+                if feedback:
+                    st.write(feedback)
+                else:
+                    st.write("Click 'Generate All Feedback' to see AI insights.")
+
+        if st.session_state["ai_feedback"]:
+            try:
+                table_md = table_df.to_markdown()
+            except Exception:
+                table_md = table_df.to_csv()
+            sections = ["# Benchmark Report", table_md]
+            for club, fb in st.session_state["ai_feedback"].items():
+                sections.append(f"## {club} Feedback\n{fb}")
+            report_md = "\n\n".join(sections)
+            st.download_button(
+                "Download Report", report_md, file_name="benchmark_report.md"
+            )
 
         st.markdown("---")
         st.markdown(
             "This report compares your club performance against Jon Sherman–inspired benchmarks for mid-handicap players. Use ✅ and ❌ to focus your practice on key weaknesses."
         )
+
