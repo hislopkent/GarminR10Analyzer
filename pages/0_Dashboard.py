@@ -9,6 +9,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from utils.logger import logger
+from utils.data_utils import coerce_numeric
 
 # Ensure session data is available
 if "session_df" not in st.session_state or st.session_state["session_df"].empty:
@@ -33,6 +34,10 @@ col_map = {
     "Spin Rate": "spin_rate",
 }
 _df = _df.rename(columns={k: v for k, v in col_map.items() if k in _df.columns})
+# ``rename`` may introduce duplicate column names (e.g., "Carry" and
+# "Carry Distance" both mapping to ``carry_distance``).  Drop duplicates to
+# ensure downstream column selection returns a Series instead of a DataFrame.
+_df = _df.loc[:, ~_df.columns.duplicated()]
 
 required_cols = [
     "session_name",
@@ -49,7 +54,7 @@ if missing:
 
 # Convert numeric columns
 for col in ["carry_distance", "ball_speed", "launch_angle", "spin_rate"]:
-    _df[col] = pd.to_numeric(_df[col], errors="coerce")
+    _df[col] = coerce_numeric(_df[col])
 
 df = _df
 

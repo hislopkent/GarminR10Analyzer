@@ -5,6 +5,7 @@ import openai
 from typing import Dict
 
 import pandas as pd
+from .data_utils import coerce_numeric
 
 
 def generate_ai_summary(club_name, df):
@@ -25,10 +26,10 @@ def generate_ai_summary(club_name, df):
     # Coerce numeric columns to floats; missing columns result in NaN values so
     # that formatting below does not raise ``TypeError``.
     if carry_col in shots.columns:
-        shots[carry_col] = pd.to_numeric(shots[carry_col], errors="coerce")
+        shots[carry_col] = coerce_numeric(shots[carry_col])
     for col in ["Smash Factor", "Launch Angle", "Backspin"]:
         if col in shots.columns:
-            shots[col] = pd.to_numeric(shots[col], errors="coerce")
+            shots[col] = coerce_numeric(shots[col])
 
     carry = shots[carry_col].mean() if carry_col in shots.columns else float("nan")
     smash = shots["Smash Factor"].mean() if "Smash Factor" in shots.columns else float("nan")
@@ -119,10 +120,10 @@ def generate_ai_batch_summaries(df) -> Dict[str, str]:
         carry_col = "Carry Distance" if "Carry Distance" in shots.columns else "Carry"
         shots = shots.copy()
         if carry_col in shots.columns:
-            shots[carry_col] = pd.to_numeric(shots[carry_col], errors="coerce")
+            shots[carry_col] = coerce_numeric(shots[carry_col])
         for col in ["Smash Factor", "Launch Angle", "Backspin"]:
             if col in shots.columns:
-                shots[col] = pd.to_numeric(shots[col], errors="coerce")
+                shots[col] = coerce_numeric(shots[col])
         carry = shots[carry_col].mean() if carry_col in shots.columns else float("nan")
         smash = shots["Smash Factor"].mean() if "Smash Factor" in shots.columns else float("nan")
         launch = shots["Launch Angle"].mean() if "Launch Angle" in shots.columns else float("nan")

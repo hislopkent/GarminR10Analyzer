@@ -12,6 +12,7 @@ logger.info("📄 Page loaded: 4 AI Insights")
 
 import pandas as pd
 from utils.ai_feedback import generate_ai_summary
+from utils.data_utils import coerce_numeric
 
 st.title("🧠 AI Insights")
 
@@ -22,7 +23,7 @@ if "session_df" not in st.session_state or st.session_state["session_df"].empty:
 df = st.session_state["session_df"].copy()
 for col in ["Carry Distance", "Carry", "Smash Factor", "Launch Angle", "Backspin"]:
     if col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+        df[col] = coerce_numeric(df[col])
 club_list = sorted(df["Club"].dropna().unique())
 selected_club = st.selectbox("Select a club for feedback", club_list)
 

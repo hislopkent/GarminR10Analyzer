@@ -13,6 +13,7 @@ from typing import Dict, List
 import pandas as pd
 
 from .benchmarks import get_benchmarks
+from .data_utils import coerce_numeric
 
 
 @dataclass
@@ -88,11 +89,12 @@ def recommend_drills(df: pd.DataFrame) -> Dict[str, List[Recommendation]]:
         is_wedge = any(keyword in club_lower for keyword in wedge_keywords)
 
         # Work on a copy and coerce relevant columns to numeric to avoid
-        # ``TypeError`` when the source data contains strings.
+        # ``TypeError`` when the source data contains strings or duplicate
+        # column names.
         club_df = club_df.copy()
         for col in ["Smash Factor", "Carry Distance", "Launch Angle", "Backspin"]:
             if col in club_df.columns:
-                club_df[col] = pd.to_numeric(club_df[col], errors="coerce")
+                club_df[col] = coerce_numeric(club_df[col])
 
         if bench.get("Smash Factor") is not None and "Smash Factor" in club_df.columns:
             if club_df["Smash Factor"].min() < bench["Smash Factor"]:

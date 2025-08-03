@@ -17,6 +17,7 @@ import pandas as pd
 
 from .drill_recommendations import Recommendation, recommend_drills
 from .benchmarks import get_benchmarks
+from .data_utils import coerce_numeric
 
 
 @dataclass
@@ -104,11 +105,11 @@ def summarize_performance(df: pd.DataFrame) -> str:
     for option in ("Carry Distance", "Carry"):
         if option in df.columns:
             carry_col = option
-            df[carry_col] = pd.to_numeric(df[carry_col], errors="coerce")
+            df[carry_col] = coerce_numeric(df[carry_col])
             break
 
     if "Offline" in df.columns:
-        df["Offline"] = pd.to_numeric(df["Offline"], errors="coerce")
+        df["Offline"] = coerce_numeric(df["Offline"])
 
     misses = MissCounts()
     if carry_col or "Offline" in df.columns:

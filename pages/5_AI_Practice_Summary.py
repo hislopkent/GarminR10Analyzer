@@ -10,6 +10,7 @@ if not uploaded_files:
 
 import pandas as pd
 from utils.practice_ai import analyze_practice_session
+from utils.data_utils import coerce_numeric
 
 st.title("🧠 AI Practice Summary")
 
@@ -27,7 +28,7 @@ if df is not None and not df.empty:
         "Offline",
     ]:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+            df[col] = coerce_numeric(df[col])
     logger.info("Analyzing session with AI practice engine")
     results = analyze_practice_session(df)
 
