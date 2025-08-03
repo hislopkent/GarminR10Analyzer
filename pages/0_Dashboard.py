@@ -218,8 +218,7 @@ else:
 
         lateral_col = next((col for col in ['Offline', 'Side', 'Deviation', 'Lateral', 'Sidespin'] if col in filtered.columns), None)
         if lateral_col:
-            st.subheader("Carry Dispersion")
-            group_by = st.radio("Group shots by", ["Club", "Session"], horizontal=True)
+            st.subheader("Shot Dispersion by Club")
 
             def std_ellipse(x, y, n_std=1.0, num_points=100):
                 if len(x) < 2:
@@ -243,14 +242,14 @@ else:
 
             fig_disp = go.Figure()
             colors = px.colors.qualitative.Plotly
-            for i, (name, grp) in enumerate(filtered.groupby(group_by)):
+            for i, (club, grp) in enumerate(filtered.groupby("Club")):
                 color = colors[i % len(colors)]
                 fig_disp.add_trace(
                     go.Scatter(
                         x=grp[lateral_col],
                         y=grp['Carry'],
                         mode='markers',
-                        name=str(name),
+                        name=str(club),
                         marker=dict(color=color)
                     )
                 )
@@ -266,7 +265,7 @@ else:
                         )
                     )
             fig_disp.update_layout(
-                title=f"Carry Dispersion by {group_by}",
+                title="Shot Dispersion (Carry vs. Lateral)",
                 xaxis_title=lateral_col,
                 yaxis_title='Carry'
             )
