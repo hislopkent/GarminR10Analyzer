@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import openai
 import plotly.express as px
+import os
 
 st.set_page_config(layout="centered")
 st.header("📊 Dashboard – Club Summary")
@@ -126,9 +127,12 @@ else:
     
     st.subheader("AI Insights")
     focus = st.text_input("AI Focus (e.g., 'irons only' or 'distance improvement')", "")
-    api_key = st.text_input("Enter OpenAI API Key", type="password")
-    assistant_id = st.text_input("Enter Golf Pro Assistant ID", type="password", help="Get this from https://platform.openai.com/assistants")
-    if api_key and assistant_id and st.button("Generate AI Insights"):
+    # Retrieve API key and Assistant ID from Render environment variables
+    api_key = os.environ.get("OPENAI_API_KEY")
+    assistant_id = os.environ.get("ASSISTANT_ID")
+    if not api_key or not assistant_id:
+        st.warning("OpenAI API Key or Assistant ID not set in Render environment variables. Set OPENAI_API_KEY and ASSISTANT_ID in your Render dashboard.")
+    elif st.button("Generate AI Insights"):
         try:
             client = openai.OpenAI(api_key=api_key)
             thread = client.beta.threads.create()
@@ -151,6 +155,4 @@ else:
             insights = messages.data[0].content[0].text.value
             st.write(insights)
         except Exception as e:
-            st.error(f"Error generating insights: {str(e)}. Check your API key, Assistant ID, or try again. If quota exceeded, upgrade your OpenAI plan at https://platform.openai.com/account/billing or wait for reset.")
-    elif not api_key or not assistant_id:
-        st.info("Enter your OpenAI API key and Golf Pro Assistant ID above to generate AI-powered suggestions on your data (e.g., 'Improve driver smash factor for better distance'). Get keys at openai.com.")
+            st.error(f"Error generating insights: {str(e)}. Check environment variables or try again. If quota exceeded, upgrade your OpenAI plan at https://platform.openai.com/account/billing or wait for reset.")
