@@ -8,17 +8,22 @@ st.set_page_config(layout="centered")
 st.header("📊 Dashboard – Club Summary")
 
 # CSS for compact tables
-st.markdown("""<style>.dataframe {font-size: small; overflow-x: auto;}</style>""", unsafe_allow_html=True)
+st.markdown("""
+    <style>
+        .dataframe {font-size: small; overflow-x: auto;}
+    </style>
+""", unsafe_allow_html=True)
 
 df_all = st.session_state.get('df_all')
 
 if df_all is None or df_all.empty:
     st.warning("No session data uploaded yet. Go to the Home page to upload.")
     if st.button("Go to Home (Upload)"):
+        st.session_state["current_page"] = "app.py"
         st.switch_page("app.py")
 else:
     st.subheader("Averages per Club")
-    numeric_cols = ['Carry', 'Backspin', 'Sidespin', 'Total', 'Smash Factor', 'Apex Height', 'Launch Angle', 'Attack Angle']  # Added Launch Angle and Attack Angle
+    numeric_cols = ['Carry', 'Backspin', 'Sidespin', 'Total', 'Smash Factor', 'Apex Height', 'Launch Angle', 'Attack Angle']
     df_all = df_all.copy()
     
     # Convert all numeric columns to numeric, coercing errors to NaN
@@ -57,7 +62,6 @@ else:
         st.info("Outliers removed using IQR on Carry distance per club (e.g., excluding poor shots like 100-yard drivers).")
     
     if remove_contact_outliers:
-        # Club-specific thresholds for fat/thin detection
         def is_poor_contact(row):
             club = row['Club']
             smash = row['Smash Factor']
@@ -72,7 +76,7 @@ else:
             elif 'Wedge' in club:
                 return smash < 1.2 or launch < 25 or launch > 45 or backspin < 6000 or backspin > 12000 or attack < -6 or attack > -2
             else:
-                return False  # Default: no removal for unknown clubs
+                return False
         
         filtered = filtered[~filtered.apply(is_poor_contact, axis=1)]
         st.info("Fat/thin shots removed using thresholds on Smash Factor (poor contact), Launch Angle (high/low), Backspin (extreme), and Attack Angle (too negative for fat). Thresholds are club-specific.")
@@ -97,22 +101,19 @@ else:
     
     # Improved chart: Altair grouped bar for mean and median, with error bars for std on mean
     if not grouped_flat.empty:
-        # Prepare data for chart (focus on Carry for example)
         chart_data = grouped_flat[['Club', 'Carry_mean', 'Carry_median', 'Carry_std']]
         chart_data = chart_data.melt(id_vars=['Club'], value_vars=['Carry_mean', 'Carry_median'], var_name='Stat', value_name='Value')
         chart_data['Std'] = chart_data.apply(lambda row: grouped_flat.loc[grouped_flat['Club'] == row['Club'], 'Carry_std'].values[0] if row['Stat'] == 'Carry_mean' else 0, axis=1)
         chart_data['Lower'] = chart_data['Value'] - chart_data['Std']
         chart_data['Upper'] = chart_data['Value'] + chart_data['Std']
 
-        # Bar chart
         bar = alt.Chart(chart_data).mark_bar().encode(
             x='Club:O',
             y='Value:Q',
-            color='Stat:N',
+            color=alt.Color('Stat:N', scale=alt.Scale(range=['#1f77b4', '#2ca02c'])),
             tooltip=['Club', 'Stat', 'Value', 'Std']
         ).properties(title='Carry Distance: Mean and Median with Std Deviation')
 
-        # Error bars for mean
         error = alt.Chart(chart_data[chart_data['Stat'] == 'Carry_mean']).mark_errorbar(color='black').encode(
             x='Club:O',
             y='Lower:Q',
@@ -139,3 +140,8 @@ else:
             st.error(f"Error generating insights: {str(e)}. Check your API key or try again. If quota exceeded, upgrade your OpenAI plan at https://platform.openai.com/account/billing or wait for reset.")
     elif not api_key:
         st.info("Enter your OpenAI API key above to generate AI-powered suggestions on your data (e.g., 'Improve driver smash factor for better distance'). Get a key at openai.com.")
+    
+    # Back navigation
+    if st.button("Back to Home"):
+        st.session_state["current_page"] = "app.py"
+        st.switch_page("app.py")
