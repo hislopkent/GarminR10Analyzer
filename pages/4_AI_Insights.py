@@ -14,6 +14,8 @@ selected_club = st.selectbox("Select a club for feedback", club_list)
 if st.button("🧠 Generate AI Summary"):
     with st.spinner("Generating AI summary..."):
         feedback = generate_ai_summary(selected_club, df)
+        sampled_df = df[df['Club'] == selected_club].sample(n=min(25, len(df[df['Club'] == selected_club])), random_state=42)
+        feedback = generate_ai_summary(selected_club, sampled_df)
         st.session_state[f"ai_{selected_club}"] = feedback
         st.success("✅ Summary generated!")
 

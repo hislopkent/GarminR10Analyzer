@@ -12,6 +12,7 @@ from utils.session_loader import load_sessions
 
 # --- File Upload ---
 uploaded_files = st.file_uploader('Upload Garmin R10 CSV files', type='csv', accept_multiple_files=True)
+keep_all = st.checkbox('Keep all columns in uploaded data (advanced users)', value=False)
 st.warning('⚠️ Uploads over 100MB may fail on free hosting tiers like Render Starter Plan.')
 
 # Validate and summarize uploaded data
@@ -24,6 +25,10 @@ for file in uploaded_files:
 
 if valid_files:
     session_df = load_sessions(valid_files)
+    session_df = load_sessions(valid_files, keep_all_columns=keep_all)
+    club_dataframes = {club: session_df[session_df['Club'] == club] for club in session_df['Club'].unique()}
+    st.session_state["session_df"] = session_df
+    st.session_state["club_data"] = club_dataframes
     st.session_state["session_df"] = session_df
 
     st.success(f"Loaded {len(session_df)} shots from {len(valid_files)} sessions.")

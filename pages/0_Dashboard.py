@@ -10,16 +10,16 @@ if "session_df" not in st.session_state or st.session_state["session_df"].empty:
     st.info("Please upload session files from the Home page to view this dashboard.")
     st.stop()
 
-df = st.session_state["session_df"]
+club_data = st.session_state["club_data"]
 if "Club" not in df.columns:
     st.error("❌ The uploaded data does not contain a 'Club' column. Please check your CSV files.")
     st.stop()
 
 # Sidebar club selection
-club_list = sorted(df["Club"].dropna().unique())
+club_list = sorted(club_data.keys().dropna().unique())
 selected_club = st.sidebar.selectbox("Select a club to view", club_list)
 
-club_data = df[df["Club"] == selected_club]
+club_data = df[club_data.keys() == selected_club]
 
 # Show basic stats
 st.subheader(f"Stats for {selected_club}")

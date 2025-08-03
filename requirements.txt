@@ -4,3 +4,4 @@ numpy
 openai
 python-dotenv
 plotly
+statsmodels>=0.13.0
