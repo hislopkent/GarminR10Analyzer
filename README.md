@@ -22,8 +22,8 @@ A Streamlit-based app for analyzing and improving your golf performance using da
 - Built-in feedback for practice priorities
 
 ### 🧠 AI Insights (Optional)
-- Enter OpenAI key to generate coaching-style analysis
-- Evaluates consistency, contact, and improvement areas
+- Requires `OPENAI_API_KEY` and `OPENAI_ASSISTANT_ID` environment variables
+- Generates coaching-style analysis and per-club summaries
 
 ---
 

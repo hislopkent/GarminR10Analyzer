@@ -11,8 +11,8 @@ services:
         value: 8501
       - key: OPENAI_API_KEY
         fromEnv: OPENAI_API_KEY
-      - key: ASSISTANT_ID
-        fromEnv: ASSISTANT_ID
+      - key: OPENAI_ASSISTANT_ID
+        fromEnv: OPENAI_ASSISTANT_ID
       - key: PASSWORD
         fromEnv: PASSWORD
     dockerCommand: streamlit run app.py --server.port $PORT --server.enableCORS false
