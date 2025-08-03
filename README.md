@@ -60,6 +60,11 @@ streamlit run app.py
 2. Deploy using `render.yaml` + Dockerfile
 3. Upload your CSV files to begin
 
+### 📦 File Upload Limits
+- Render limits request bodies to ~100MB. The app caps uploads at 50MB per file to stay under this limit.
+- If a file is larger than 50MB, split it before uploading.
+- Malformed CSVs are detected and skipped with a clear error message.
+
 ---
 
 ## 📥 Garmin CSV Format

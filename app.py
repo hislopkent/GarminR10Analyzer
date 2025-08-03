@@ -4,6 +4,8 @@ import numpy as np
 from datetime import datetime
 import os
 
+MAX_FILE_SIZE_MB = 50
+
 from utils.sidebar import render_sidebar
 
 # Password validation
@@ -59,14 +61,18 @@ else:
             total_rows = 0
             session_counts = {}
             for idx, file in enumerate(uploaded_files):
-                if file.size > 50 * 1024 * 1024:
-                    st.warning(f"File {file.name} exceeds 50MB. Skip or split the file.")
+                if file.size > MAX_FILE_SIZE_MB * 1024 * 1024:
+                    st.warning(
+                        f"File {file.name} exceeds {MAX_FILE_SIZE_MB}MB. Skip or split the file."
+                    )
                     continue
                 try:
                     df = pd.read_csv(file)
                     required_cols = ['Date', 'Club Type', 'Carry Distance']
                     if not all(col in df.columns for col in required_cols):
-                        st.error(f"CSV {file.name} missing required columns: {required_cols}. File skipped.")
+                        st.error(
+                            f"CSV {file.name} missing required columns: {required_cols}. File skipped."
+                        )
                         continue
                     if 'Date' in df.columns:
                         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
@@ -91,8 +97,14 @@ else:
                     dfs.append(df)
                     total_rows += len(df)
                     st.progress((idx + 1) / len(uploaded_files))
+                except pd.errors.ParserError:
+                    st.error(
+                        f"Error processing {file.name}: Malformed CSV. File skipped."
+                    )
                 except Exception as e:
-                    st.error(f"Error processing {file.name}: {str(e)}. File skipped. Check if it's a valid CSV.")
+                    st.error(
+                        f"Error processing {file.name}: {str(e)}. File skipped. Check if it's a valid CSV."
+                    )
             
             if not dfs:
                 st.error("No valid CSVs loaded. Please check your files and try again.")
