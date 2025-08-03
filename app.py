@@ -78,7 +78,14 @@ else:
                     if 'Date' in df.columns:
                         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
                     if 'Club Type' in df.columns:
-                        df.rename(columns={'Club Type': 'Club', 'Carry Distance': 'Carry', 'Total Distance': 'Total'}, inplace=True)
+                        df.rename(
+                            columns={
+                                'Club Type': 'Club',
+                                'Carry Distance': 'Carry',
+                                'Total Distance': 'Total',
+                            },
+                            inplace=True,
+                        )
                         df['Carry'] = pd.to_numeric(df['Carry'], errors='coerce')
                         df['Total'] = pd.to_numeric(df['Total'], errors='coerce')
                     dfs.append(df)
