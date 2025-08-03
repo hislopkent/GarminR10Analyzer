@@ -1,5 +1,11 @@
 import streamlit as st
 from utils.logger import logger
+uploaded_files = st.session_state.get("uploaded_files", [])
+if not uploaded_files:
+    st.warning("📤 Please upload CSV files on the home page first.")
+    st.stop()
+
+from utils.logger import logger
 logger.info("📄 Page loaded: 1 Sessions Viewer")
 import streamlit as st
 import os

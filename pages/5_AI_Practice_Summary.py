@@ -1,4 +1,10 @@
 import streamlit as st
+from utils.logger import logger
+uploaded_files = st.session_state.get("uploaded_files", [])
+if not uploaded_files:
+    st.warning("📤 Please upload CSV files on the home page first.")
+    st.stop()
+
 import pandas as pd
 from utils.session_loader import load_sessions
 from utils.practice_ai import analyze_practice_session

@@ -1,51 +1,17 @@
 import streamlit as st
 from utils.logger import logger
-logger.info("🚀 App started")
-import pandas as pd
-import numpy as np
-import os
-from utils.sidebar import render_sidebar
 
-st.set_page_config(page_title="Garmin R10 Analyzer", layout="centered")
+st.set_page_config(page_title="Garmin R10 Analyzer", layout="wide")
+st.title("📊 Garmin R10 Analyzer")
 
-render_sidebar()
-st.title("Garmin R10 Multi-Session Analyzer")
-from utils.session_loader import load_sessions
+uploaded_files = st.file_uploader(
+    "Upload one or more Garmin CSV files",
+    type=["csv"],
+    accept_multiple_files=True
+)
 
-# --- File Upload ---
-keep_all = st.checkbox('Keep all columns in uploaded data (advanced users)', value=False)
-st.warning('⚠️ Uploads over 100MB may fail on free hosting tiers like Render Starter Plan.')
-
-# Validate and summarize uploaded data
-valid_files = []
-for file in uploaded_files:
-    if file.size > 100 * 1024 * 1024:  # 100MB
-        st.error(f"{file.name} is too large (>100MB). Please upload a smaller file.")
-    else:
-        valid_files.append(file)
-
-if valid_files:
-    session_df = load_sessions(valid_files)
-    session_df = load_sessions(valid_files, keep_all_columns=keep_all)
-    club_dataframes = {club: session_df[session_df['Club'] == club] for club in session_df['Club'].unique()}
-    st.session_state["session_df"] = session_df
-    st.session_state["club_data"] = club_dataframes
-    st.session_state["session_df"] = session_df
-
-    st.success(f"Loaded {len(session_df)} shots from {len(valid_files)} sessions.")
-    st.dataframe(session_df.head(1000), use_container_width=True)
-else:
-    st.stop()
 if uploaded_files:
-    session_df = load_sessions(uploaded_files)
-    st.session_state["session_df"] = session_df
-    st.success(f"Loaded {len(session_df)} shots from {len(uploaded_files)} sessions.")
-    st.dataframe(session_df.head(), use_container_width=True)
-st.markdown("Upload your Garmin R10 CSV files below to get started. View full data or analyze summaries via the sidebar.")
-
-
-if __name__ == '__main__':
-    import streamlit.web.cli as stcli
-    import sys
-    sys.argv = ['streamlit', 'run', 'app.py']
-    sys.exit(stcli.main())
+    st.session_state["uploaded_files"] = uploaded_files
+    logger.info(f"{len(uploaded_files)} files uploaded and stored in session state")
+else:
+    st.session_state.pop("uploaded_files", None)
