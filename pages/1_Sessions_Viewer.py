@@ -59,6 +59,41 @@ df_all = st.session_state.get("df_all")
 if df_all is None or df_all.empty:
     st.warning("No session data uploaded yet. Go to the Home page to upload.")
 else:
-    st.subheader("Full Processed Data")
-    st.dataframe(df_all, use_container_width=True)
-    st.info("Explore all shots above. Navigate to Home for uploads or Dashboard for summaries.")
+    # Sidebar options to select which session(s) to display
+    df = df_all.copy()
+    session_names = df["Session Name"].dropna().unique().tolist()
+    st.sidebar.markdown("### Session View")
+    view_option = st.sidebar.selectbox(
+        "Choose sessions to display",
+        ["Latest Session", "Last 5 Sessions Combined", "Select Sessions"],
+    )
+
+    if "Date" in df.columns:
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
+    if view_option == "Latest Session":
+        if "Date" in df.columns and df["Date"].notna().any():
+            latest_session = df.loc[df["Date"].idxmax(), "Session Name"]
+        else:
+            latest_session = session_names[-1]
+        df_view = df[df["Session Name"] == latest_session]
+    elif view_option == "Last 5 Sessions Combined":
+        if "Date" in df.columns and df["Date"].notna().any():
+            session_order = (
+                df.drop_duplicates("Session Name").sort_values("Date")
+            )["Session Name"].tolist()
+        else:
+            session_order = session_names
+        last_sessions = session_order[-5:]
+        df_view = df[df["Session Name"].isin(last_sessions)]
+    else:  # Select Sessions
+        chosen = st.sidebar.multiselect("Select session(s)", session_names)
+        df_view = df[df["Session Name"].isin(chosen)] if chosen else df.iloc[0:0]
+
+    st.subheader("Processed Data")
+    st.dataframe(df_view, use_container_width=True)
+    if df_view.empty:
+        st.info("No sessions selected.")
+    st.info(
+        "Explore the shots above. Navigate to Home for uploads or Dashboard for summaries."
+    )
