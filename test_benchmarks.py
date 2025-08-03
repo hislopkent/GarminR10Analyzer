@@ -14,6 +14,18 @@ def test_driver_benchmark_all_good():
     result = check_benchmark("Driver", stats)
     assert all("✅" in line for line in result)
 
+
+def test_driver_case_insensitive():
+    """Benchmark lookup should be case-insensitive."""
+    stats = {
+        'Carry': 230,
+        'Smash Factor': 1.46,
+        'Launch Angle': 13,
+        'Backspin': 2500,
+    }
+    result = check_benchmark("driver", stats)
+    assert all("✅" in line for line in result)
+
 def test_driver_benchmark_mixed():
     stats = {
         'Carry': 210,
