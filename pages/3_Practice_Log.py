@@ -3,6 +3,10 @@ import pandas as pd
 from datetime import datetime
 
 st.title("📝 Practice Log")
+if "session_df" not in st.session_state or "club_data" not in st.session_state:
+    st.warning("⚠️ Please upload session data from the home page first.")
+    st.stop()
+
 
 # Initialize log in session_state
 if "practice_log" not in st.session_state:

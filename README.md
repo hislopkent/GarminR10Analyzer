@@ -91,3 +91,13 @@ Ensure your CSV contains these columns (from Garmin R10 export):
 - `Smash Factor`, `Backspin`, `Launch Angle`, etc.
 
 ---
+
+
+---
+### 🔐 OpenAI API Key Setup
+To use the AI Insights feature, set your OpenAI API key as an environment variable:
+
+```
+OPENAI_API_KEY=your_key_here
+```
+This is securely accessed via `os.getenv()`.

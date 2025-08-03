@@ -41,3 +41,10 @@ if uploaded_files:
     st.success(f"Loaded {len(session_df)} shots from {len(uploaded_files)} sessions.")
     st.dataframe(session_df.head(), use_container_width=True)
 st.markdown("Upload your Garmin R10 CSV files below to get started. View full data or analyze summaries via the sidebar.")
+
+
+if __name__ == '__main__':
+    import streamlit.web.cli as stcli
+    import sys
+    sys.argv = ['streamlit', 'run', 'app.py']
+    sys.exit(stcli.main())
