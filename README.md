@@ -11,7 +11,7 @@ A Streamlit-based app for analyzing and improving your golf performance using da
 - Automatically groups data by session and club
 
 ### 📊 Dashboard View
-- Aggregates club data (Carry, Smash, Launch Angle, etc.)
+- Aggregates club data (Carry, Smash Factor, Launch Angle, etc.)
 - Optional filters to remove outliers or poor contact shots
 - Interactive Plotly charts (Mean vs. Median vs. Std Dev)
 - Smart session and club filtering
