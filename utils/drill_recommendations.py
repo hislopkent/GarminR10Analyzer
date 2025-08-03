@@ -36,6 +36,14 @@ _DRILLS: Dict[str, Recommendation] = {
         issue="Poor launch angle",
         drill="Try Jon Sherman's low-point control drill to dial in launch.",
     ),
+    "high_wedge_launch": Recommendation(
+        issue="Launch angle too high with wedge",
+        drill="Use flighted wedge drills to lower trajectory.",
+    ),
+    "high_wedge_spin": Recommendation(
+        issue="Excessive wedge backspin",
+        drill="Practice controlling spin with partial-swing wedge drills.",
+    ),
 }
 
 
@@ -75,6 +83,9 @@ def recommend_drills(df: pd.DataFrame) -> Dict[str, List[Recommendation]]:
     for club, club_df in df.groupby("Club Type"):
         recs: List[Recommendation] = []
         bench = _match_benchmark(club)
+        club_lower = club.lower()
+        wedge_keywords = ["wedge", "pw", "sw", "gw", "lw", "aw"]
+        is_wedge = any(keyword in club_lower for keyword in wedge_keywords)
 
         if bench.get("Smash Factor") is not None:
             if club_df["Smash Factor"].min() < bench["Smash Factor"]:
@@ -89,6 +100,17 @@ def recommend_drills(df: pd.DataFrame) -> Dict[str, List[Recommendation]]:
             low, high = bench["Launch Angle"]
             if mean_launch < low or mean_launch > high:
                 recs.append(_DRILLS["poor_launch"])
+
+        if is_wedge:
+            if "Launch Angle" in club_df.columns:
+                mean_launch = club_df["Launch Angle"].mean()
+                if mean_launch > 40:
+                    recs.append(_DRILLS["high_wedge_launch"])
+            if bench.get("Backspin") is not None and "Backspin" in club_df.columns:
+                mean_spin = club_df["Backspin"].mean()
+                _, high_spin = bench["Backspin"]
+                if mean_spin > high_spin:
+                    recs.append(_DRILLS["high_wedge_spin"])
 
         recommendations[club] = recs
 
