@@ -18,7 +18,21 @@ AVAILABLE_DRILLS = [rec.drill for rec in _DRILLS.values()]
 
 # Load existing practice log if available
 if os.path.exists(PRACTICE_LOG_FILE):
-    log_df = pd.read_csv(PRACTICE_LOG_FILE)
+    try:
+        log_df = pd.read_csv(PRACTICE_LOG_FILE)
+    except Exception as e:
+        st.error(f"Failed to load practice log: {e}")
+        try:
+            with open(
+                PRACTICE_LOG_FILE, "r", encoding="utf-8", errors="replace"
+            ) as f:
+                preview_lines = [next(f, "") for _ in range(10)]
+            preview_text = "".join(preview_lines)
+            st.text("First 10 lines of the practice log file:")
+            st.code(preview_text)
+        except Exception:
+            pass
+        log_df = pd.DataFrame(columns=["Date", "Notes", "Drills Completed"])
 else:
     log_df = pd.DataFrame(columns=["Date", "Notes", "Drills Completed"])
 
