@@ -8,17 +8,19 @@ st.header("📋 Sessions Viewer")
 st.markdown("""
     <style>
         .dataframe {font-size: small; overflow-x: auto;}
+        .sidebar .sidebar-content {background-color: #f0f2f6; padding: 10px;}
+        .sidebar a {color: #2ca02c; text-decoration: none;}
+        .sidebar a:hover {background-color: #228B22; text-decoration: underline;}
     </style>
 """, unsafe_allow_html=True)
 
-# Consistent sidebar navigation
+# Consistent sidebar navigation with links
 st.sidebar.title("Navigation")
-page = st.sidebar.selectbox("Select Page", ["🏠 Home (Upload CSVs)", "📋 Sessions Viewer", "📊 Dashboard"])
-
-if page == "🏠 Home (Upload CSVs)":
-    st.switch_page("app.py")
-elif page == "📊 Dashboard":
-    st.switch_page("pages/0_dashboard.py")
+st.sidebar.markdown("""
+- [🏠 Home (Upload CSVs)](/)
+- [📋 Sessions Viewer](/1_Sessions_Viewer)
+- [📊 Dashboard](/0_dashboard)
+""", unsafe_allow_html=True)
 
 # Conditional guidance
 if 'df_all' not in st.session_state or st.session_state['df_all'].empty:
