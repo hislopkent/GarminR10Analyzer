@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import openai
 import plotly.express as px
+import plotly.graph_objects as go
 import os
 
 from utils.sidebar import render_sidebar
@@ -197,6 +198,64 @@ else:
                      hover_data=['Std'])
         fig.update_layout(yaxis_title=metric, hovermode="x", yaxis_tickformat=".1f", legend_title_text='Statistic')
         st.plotly_chart(fig, use_container_width=True)
+
+        lateral_col = next((col for col in ['Offline', 'Side', 'Deviation', 'Lateral', 'Sidespin'] if col in filtered.columns), None)
+        if lateral_col:
+            st.subheader("Carry Dispersion")
+            group_by = st.radio("Group shots by", ["Club", "Session"], horizontal=True)
+
+            def std_ellipse(x, y, n_std=1.0, num_points=100):
+                if len(x) < 2:
+                    return None, None
+                cov = np.cov(x, y)
+                if np.linalg.det(cov) == 0:
+                    return None, None
+                eigvals, eigvecs = np.linalg.eigh(cov)
+                order = eigvals.argsort()[::-1]
+                eigvals, eigvecs = eigvals[order], eigvecs[:, order]
+                theta = np.linspace(0, 2 * np.pi, num_points)
+                ellipse = np.array([
+                    np.sqrt(eigvals[0]) * np.cos(theta),
+                    np.sqrt(eigvals[1]) * np.sin(theta),
+                ])
+                transform = eigvecs @ ellipse
+                center = [np.mean(x), np.mean(y)]
+                xs = center[0] + n_std * transform[0]
+                ys = center[1] + n_std * transform[1]
+                return xs, ys
+
+            fig_disp = go.Figure()
+            colors = px.colors.qualitative.Plotly
+            for i, (name, grp) in enumerate(filtered.groupby(group_by)):
+                color = colors[i % len(colors)]
+                fig_disp.add_trace(
+                    go.Scatter(
+                        x=grp[lateral_col],
+                        y=grp['Carry'],
+                        mode='markers',
+                        name=str(name),
+                        marker=dict(color=color)
+                    )
+                )
+                ell_x, ell_y = std_ellipse(grp[lateral_col], grp['Carry'])
+                if ell_x is not None:
+                    fig_disp.add_trace(
+                        go.Scatter(
+                            x=ell_x,
+                            y=ell_y,
+                            mode='lines',
+                            showlegend=False,
+                            line=dict(color=color)
+                        )
+                    )
+            fig_disp.update_layout(
+                title=f"Carry Dispersion by {group_by}",
+                xaxis_title=lateral_col,
+                yaxis_title='Carry'
+            )
+            st.plotly_chart(fig_disp, use_container_width=True)
+        else:
+            st.info("No lateral dispersion data available to plot.")
 
     st.markdown("---")
     show_ai_feedback = st.checkbox("\U0001F4A1 Show AI Summary Under Each Club", value=False)
