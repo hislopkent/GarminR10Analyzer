@@ -46,9 +46,9 @@ if view_option == "Latest Session":
     df_filtered = df_all[df_all["Session Name"] == latest_session]
 elif view_option == "Last 5 Sessions Combined":
     if "Date" in df_all.columns and df_all["Date"].notna().any():
-        session_order = (
-            df_all.drop_duplicates("Session Name").sort_values("Date")
-        )["Session Name"].tolist()
+        session_order = (df_all.drop_duplicates("Session Name").sort_values("Date"))[
+            "Session Name"
+        ].tolist()
     else:
         session_order = session_names
     last_sessions = session_order[-5:]
@@ -77,7 +77,9 @@ if "Club" not in df_filtered.columns:
 
 st.sidebar.markdown("### Club Filter")
 club_options = sorted(df_filtered["Club"].dropna().unique())
-selected_clubs = st.sidebar.multiselect("Select club(s)", club_options, default=club_options)
+selected_clubs = st.sidebar.multiselect(
+    "Select club(s)", club_options, default=club_options
+)
 
 if not selected_clubs:
     st.warning("No clubs selected.")
@@ -132,6 +134,65 @@ col4.metric(
     "Center Strike %",
     f"{center_strike_pct:.1f}%" if not np.isnan(center_strike_pct) else "N/A",
 )
+
+# Club category summary grid
+carry_col = "Carry Distance" if "Carry Distance" in df_filtered.columns else "Carry"
+if carry_col in df_filtered.columns:
+    df_filtered[carry_col] = pd.to_numeric(df_filtered[carry_col], errors="coerce")
+if "Smash Factor" in df_filtered.columns:
+    df_filtered["Smash Factor"] = pd.to_numeric(
+        df_filtered["Smash Factor"], errors="coerce"
+    )
+agg_dict = {}
+if carry_col in df_filtered.columns:
+    agg_dict[carry_col] = "mean"
+if "Smash Factor" in df_filtered.columns:
+    agg_dict["Smash Factor"] = "mean"
+grouped = (
+    df_filtered.groupby("Club")
+    .agg(agg_dict)
+    .rename(columns={carry_col: "Avg Carry", "Smash Factor": "Avg Smash"})
+)
+
+
+def categorize_club(club: str) -> str:
+    name = club.lower()
+    if "driver" in name:
+        return "Driver"
+    if any(w in name for w in ["wedge", "pw", "aw", "gw", "sw", "lw"]):
+        return "Wedges"
+    if "putter" in name:
+        return "Putter"
+    return "Irons"
+
+
+grouped["Category"] = grouped.index.map(categorize_club)
+category_emojis = {
+    "Driver": "🏌️",
+    "Irons": "🏌️‍♂️",
+    "Wedges": "⛏️",
+    "Putter": "⛳",
+}
+
+st.subheader("Club Categories")
+categories = ["Driver", "Irons", "Wedges", "Putter"]
+rows = [categories[i : i + 2] for i in range(0, len(categories), 2)]
+for row in rows:
+    cols = st.columns(2)
+    for col, cat in zip(cols, row):
+        with col:
+            emoji = category_emojis.get(cat, "")
+            st.markdown(f"### {emoji} {cat}")
+            cat_df = grouped[grouped["Category"] == cat]
+            if cat_df.empty:
+                st.write("No data")
+            else:
+                for club, vals in cat_df.iterrows():
+                    carry_val = vals.get("Avg Carry")
+                    smash_val = vals.get("Avg Smash")
+                    carry_text = f"{carry_val:.1f}" if pd.notna(carry_val) else "N/A"
+                    smash_text = f"{smash_val:.2f}" if pd.notna(smash_val) else "N/A"
+                    st.write(f"**{club}** - Carry: {carry_text} | Smash: {smash_text}")
 
 # Strike location distribution chart
 if "strike_location" in df_filtered.columns:
@@ -198,7 +259,9 @@ st.write(club_data.describe(include="all"))
 # Plot carry distance distribution
 if "Carry" in club_data.columns:
     st.plotly_chart(
-        px.histogram(club_data, x="Carry", nbins=20, title="Carry Distance Distribution")
+        px.histogram(
+            club_data, x="Carry", nbins=20, title="Carry Distance Distribution"
+        )
     )
 elif "Carry Distance" in club_data.columns:
     st.plotly_chart(
