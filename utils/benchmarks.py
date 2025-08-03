@@ -34,15 +34,20 @@ def check_benchmark(club_name, stats):
     result_lines = []
 
     target_type = None
-    # Perform a case-insensitive lookup for the club name.  The Garmin
-    # data sometimes provides club names in lowercase (e.g. "driver")
-    # or with different capitalisation.  The previous implementation
-    # checked using a simple substring search which failed when the
-    # capitalisation differed, causing the function to think there was
-    # no benchmark available.  Normalising both strings avoids this
-    # issue and ensures that valid benchmarks are returned regardless of
-    # case.
+    # Perform a case-insensitive lookup for the club name.  Garmin data
+    # sometimes provides club names in lowercase (e.g. "driver") or with
+    # different capitalisation.  Additionally, some names such as
+    # "Pitching Wedge" are written out in full rather than using the
+    # abbreviations stored in ``benchmarks``.  Normalising both strings and
+    # handling a few common aliases avoids the function thinking a club has
+    # no benchmark available.
     club_name_lower = club_name.lower()
+    aliases = {"pitching wedge": "pw", "sand wedge": "sw"}
+    for alias, repl in aliases.items():
+        if alias in club_name_lower:
+            club_name_lower = club_name_lower.replace(alias, repl)
+            break
+
     for key in benchmarks:
         if key.lower() in club_name_lower:
             target_type = key
