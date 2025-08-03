@@ -1,6 +1,8 @@
-# benchmarks.py
+"""Benchmark targets for typical golfer performance metrics."""
+
 
 def get_benchmarks():
+    """Return a dictionary of per-club benchmark targets."""
     return {
         "Driver": {
             "Carry": 220,
@@ -30,6 +32,8 @@ def get_benchmarks():
     }
 
 def check_benchmark(club_name, stats):
+    """Compare ``stats`` for ``club_name`` against benchmark ranges."""
+
     benchmarks = get_benchmarks()
     result_lines = []
 

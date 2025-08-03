@@ -1,3 +1,5 @@
+"""Summarise an entire practice session with AI-derived feedback."""
+
 import streamlit as st
 from utils.logger import logger
 

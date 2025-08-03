@@ -1,3 +1,11 @@
+"""Dashboard page showing club statistics and basic plots.
+
+The dashboard expects session data to already be loaded into Streamlit's
+session state by ``app.py``. Users can select a club and view descriptive
+statistics along with a few Plotly visualisations to help spot trends or
+outliers.
+"""
+
 import streamlit as st
 from utils.logger import logger
 import pandas as pd

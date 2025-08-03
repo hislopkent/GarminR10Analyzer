@@ -101,3 +101,25 @@ To use the AI Insights feature, set your OpenAI API key as an environment variab
 OPENAI_API_KEY=your_key_here
 ```
 This is securely accessed via `os.getenv()`.
+
+---
+
+## 🧑‍💻 Development & Troubleshooting
+
+The codebase is intentionally lightweight so it is easy to extend with new
+pages or utilities. A few tips for working on the project:
+
+- **Session state** is managed centrally in `app.py`. Uploaded files and the
+  combined dataframe are cached to `sample_data/session_cache.pkl` so that the
+  app can recover from reloads. Clearing this file will reset the app's state.
+- **Logging** is configured via `utils/logger.py`. Messages are written to
+  `app.log` and the log level can be adjusted with the `LOG_LEVEL`
+  environment variable.
+- **Tests**: run `pytest` to execute unit tests for benchmark calculations and
+  drill recommendations. Adding tests for new utilities is encouraged.
+- **Pages & utilities**: each Streamlit page lives in the `pages/` directory and
+  most shared functionality is in `utils/`. Docstrings throughout the project
+  provide context for key functions to make future edits easier.
+
+If something looks off when running locally, start by inspecting the logs and
+verifying that your CSV files contain the expected columns.

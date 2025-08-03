@@ -1,3 +1,5 @@
+"""Central logging configuration for the app."""
+
 import logging
 import os
 

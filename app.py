@@ -1,3 +1,10 @@
+"""Home page for the Garmin R10 Analyzer Streamlit app.
+
+This module handles file uploads, session-state management and persistence
+between reloads. Uploaded CSV files are combined into a single dataframe and
+cached on disk so the user can navigate between pages without losing data.
+"""
+
 import os
 import pickle
 
@@ -13,8 +20,15 @@ st.title("📊 Garmin R10 Analyzer")
 CACHE_PATH = os.path.join("sample_data", "session_cache.pkl")
 
 
-def persist_state():
-    """Persist uploaded file names and dataframe to disk."""
+def persist_state() -> None:
+    """Persist uploaded file names and dataframe to disk.
+
+    Streamlit's session state is volatile when the app reloads.  To make the
+    experience smoother, the list of uploaded files and the combined dataframe
+    are serialized to ``CACHE_PATH``.  The cache is lightweight and can be
+    safely deleted if it becomes corrupted.
+    """
+
     data = {
         "files": st.session_state.get("uploaded_files", []),
         "df": st.session_state.get("session_df", pd.DataFrame()),
@@ -24,8 +38,9 @@ def persist_state():
     logger.info("State persisted with %d file(s)", len(data["files"]))
 
 
-def load_state():
-    """Load any previously persisted state from disk."""
+def load_state() -> None:
+    """Load previously persisted session state from disk if it exists."""
+
     if os.path.exists(CACHE_PATH):
         with open(CACHE_PATH, "rb") as f:
             data = pickle.load(f)
@@ -94,8 +109,9 @@ else:
     st.info("📤 Upload files here to begin.")
 
 
-def remove_file(name: str):
-    """Remove a file and its data from session state."""
+def remove_file(name: str) -> None:
+    """Remove a file and its associated rows from session state and cache."""
+
     if name in st.session_state["uploaded_files"]:
         st.session_state["uploaded_files"].remove(name)
         if "session_df" in st.session_state and not st.session_state["session_df"].empty:
