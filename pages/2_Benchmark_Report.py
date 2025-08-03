@@ -44,9 +44,8 @@ else:
     else:
         st.subheader("✅ Benchmark Comparison Results")
 
-        # persist AI feedback between reruns
-        if "ai_feedback" not in st.session_state:
-            st.session_state["ai_feedback"] = {}
+        # store AI summaries between reruns
+        st.session_state.setdefault("club_summaries", {})
 
         grouped = (
             filtered.groupby("Club")[numeric_cols].mean().round(1).reset_index()
@@ -85,27 +84,27 @@ else:
 
         if generate_clicked:
             for club in grouped["Club"]:
-                if club not in st.session_state["ai_feedback"]:
+                if club not in st.session_state["club_summaries"]:
                     with st.spinner(f"Analyzing {club}..."):
-                        st.session_state["ai_feedback"][club] = generate_ai_summary(
+                        st.session_state["club_summaries"][club] = generate_ai_summary(
                             club, filtered
                         )
 
         for club in grouped["Club"]:
             with st.expander(f"🧠 {club} Feedback"):
-                feedback = st.session_state["ai_feedback"].get(club)
+                feedback = st.session_state["club_summaries"].get(club)
                 if feedback:
                     st.write(feedback)
                 else:
                     st.write("Click 'Generate All Feedback' to see AI insights.")
 
-        if st.session_state["ai_feedback"]:
+        if st.session_state["club_summaries"]:
             try:
                 table_md = table_df.to_markdown()
             except Exception:
                 table_md = table_df.to_csv()
             sections = ["# Benchmark Report", table_md]
-            for club, fb in st.session_state["ai_feedback"].items():
+            for club, fb in st.session_state["club_summaries"].items():
                 sections.append(f"## {club} Feedback\n{fb}")
             report_md = "\n\n".join(sections)
             st.download_button(
