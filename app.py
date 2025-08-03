@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import os
 
 st.set_page_config(page_title="Garmin R10 Analyzer", layout="centered")
 st.title("Garmin R10 Multi-Session Analyzer")
@@ -12,24 +13,18 @@ st.markdown("""
     <style>
         .dataframe {font-size: small; overflow-x: auto;}
         .sidebar .sidebar-content {background-color: #f0f2f6; padding: 10px;}
+        .sidebar a {color: #2ca02c; text-decoration: none;}
+        .sidebar a:hover {color: #228B22; text-decoration: underline;}
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state for current page if not present
-if "current_page" not in st.session_state:
-    st.session_state["current_page"] = "app.py"
-
-# Consistent sidebar navigation
+# Consistent sidebar navigation with links
 st.sidebar.title("Navigation")
-page = st.sidebar.selectbox("Select Page", ["🏠 Home (Upload CSVs)", "📋 Sessions Viewer", "📊 Dashboard"])
-
-# Navigate based on selection, preserving state
-if page != st.session_state["current_page"]:
-    st.session_state["current_page"] = page
-    if page == "📋 Sessions Viewer":
-        st.switch_page("pages/1_Sessions_Viewer.py")
-    elif page == "📊 Dashboard":
-        st.switch_page("pages/0_dashboard.py")
+st.sidebar.markdown("""
+- [🏠 Home (Upload CSVs)](/)
+- [📋 Sessions Viewer](/1_Sessions_Viewer)
+- [📊 Dashboard](/0_dashboard)
+""", unsafe_allow_html=True)
 
 # Conditional guidance based on data
 if 'df_all' not in st.session_state or st.session_state['df_all'].empty:
@@ -57,19 +52,20 @@ def create_session_name(date_series):
 
 uploaded_files = st.file_uploader("Upload Garmin R10 CSV files", type="csv", accept_multiple_files=True)
 
-if uploaded_files and st.session_state.get("current_page") == "app.py":
+if uploaded_files:
     with st.spinner("Processing CSVs..."):
         dfs = []
         total_rows = 0
         for idx, file in enumerate(uploaded_files):
-            if file.size > 10 * 1024 * 1024:
-                st.warning(f"File {file.name} exceeds 10MB. Consider splitting large files.")
+            # Increased limit to 50MB
+            if file.size > 50 * 1024 * 1024:
+                st.warning(f"File {file.name} exceeds 50MB. Skip or split the file.")
                 continue
             try:
                 df = pd.read_csv(file)
                 required_cols = ['Date', 'Club Type', 'Carry Distance']
                 if not all(col in df.columns for col in required_cols):
-                    st.error(f"CSV {file.name} missing required columns: {required_cols}")
+                    st.error(f"CSV {file.name} missing required columns: {required_cols}. File skipped.")
                     continue
                 if 'Date' in df.columns:
                     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
@@ -81,7 +77,7 @@ if uploaded_files and st.session_state.get("current_page") == "app.py":
                 total_rows += len(df)
                 st.progress((idx + 1) / len(uploaded_files))
             except Exception as e:
-                st.error(f"Error processing {file.name}: {e}")
+                st.error(f"Error processing {file.name}: {str(e)}. File skipped. Check if it's a valid CSV.")
         
         if not dfs:
             st.error("No valid CSVs loaded. Please check your files and try again.")
