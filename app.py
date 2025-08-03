@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime
-import os
 
 st.set_page_config(page_title="Garmin R10 Analyzer", layout="centered")
 st.title("Garmin R10 Multi-Session Analyzer")
@@ -12,19 +11,15 @@ st.markdown("Upload your Garmin R10 CSV files below to get started. View full da
 st.markdown("""
     <style>
         .dataframe {font-size: small; overflow-x: auto;}
-        .stButton>button {background-color: #2ca02c; color: white; border-radius: 5px; margin: 2px;}
-        .stButton>button:hover {background-color: #228B22;}
         .sidebar .sidebar-content {background-color: #f0f2f6; padding: 10px;}
     </style>
 """, unsafe_allow_html=True)
 
-# Sidebar navigation with selectbox for cleaner look
+# Consistent sidebar navigation across all pages
 st.sidebar.title("Navigation")
 page = st.sidebar.selectbox("Select Page", ["🏠 Home (Upload CSVs)", "📋 Sessions Viewer", "📊 Dashboard"])
 
-if page == "🏠 Home (Upload CSVs)":
-    pass  # Home content below
-elif page == "📋 Sessions Viewer":
+if page == "📋 Sessions Viewer":
     st.switch_page("pages/1_Sessions_Viewer.py")
 elif page == "📊 Dashboard":
     st.switch_page("pages/0_dashboard.py")
@@ -111,11 +106,5 @@ if 'df_all' in st.session_state:
         del st.session_state['df_all']
         st.rerun()
 
-if 'df_all' in st.session_state:
-    if os.path.exists("pages/1_Sessions_Viewer.py"):
-        if st.button("View Full Sessions"):
-            st.switch_page("pages/1_Sessions_Viewer.py")
-    else:
-        st.error("Page '1_Sessions_Viewer.py' not found. Please ensure the file exists in the pages/ directory.")
 else:
     st.info("Upload one or more Garmin R10 CSV files to begin.")
