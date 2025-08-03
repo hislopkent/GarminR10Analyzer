@@ -55,29 +55,25 @@ else:
 
     uploaded_files = st.file_uploader("Upload Garmin R10 CSV files", type="csv", accept_multiple_files=True)
 
-    if uploaded_files:
-        with st.spinner("Processing CSVs..."):
-            dfs = []
-            total_rows = 0
-            session_counts = {}
-            for idx, file in enumerate(uploaded_files):
-                if file.size > MAX_FILE_SIZE_MB * 1024 * 1024:
-                    st.warning(
-                        f"File {file.name} exceeds {MAX_FILE_SIZE_MB}MB. Skip or split the file."
-                    )
-                    continue
-                try:
-                    df = pd.read_csv(file)
-                    required_cols = ['Date', 'Club Type', 'Carry Distance']
-                    if not all(col in df.columns for col in required_cols):
-                        st.error(
-                            f"CSV {file.name} missing required columns: {required_cols}. File skipped."
-                        )
-                        continue
-                    if 'Date' in df.columns:
-                        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-                        valid_dates = df['Date'].dt.date.dropna()
-                        if not valid_dates.empty:
+if uploaded_files:
+    all_data = []
+    for file in uploaded_files:
+        try:
+            MAX_SIZE = 10 * 1024 * 1024  # 10MB
+            if file.size > MAX_SIZE:
+                st.warning(f"{file.name} is too large to process. Try splitting the file.")
+                continue
+
+            content = file.read().decode("utf-8", errors="ignore")
+            st.text_area(f"Preview of {file.name}", content[:1000], height=150)
+            file.seek(0)  # reset for actual parsing
+
+            df = pd.read_csv(file)
+            all_data.append(df)
+        except Exception as e:
+            st.error(f"❌ Failed to load {file.name}: {e}")
+
+
                             session_date = valid_dates.iloc[0]
                         else:
                             session_date = datetime.now().date()
