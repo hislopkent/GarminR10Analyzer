@@ -1,12 +1,20 @@
+"""Simple practice log for jotting down notes after a session.
+
+Entries are stored in ``st.session_state`` and can be downloaded as a CSV for
+personal record keeping.  The log is intentionally lightweight and lives
+entirely on the client; there is no backend persistence.
+"""
+
 import streamlit as st
 from utils.logger import logger
+
 uploaded_files = st.session_state.get("uploaded_files", [])
 if not uploaded_files:
     st.warning("📤 Please upload CSV files on the home page first.")
     st.stop()
 
-from utils.logger import logger
 logger.info("📄 Page loaded: 3 Practice Log")
+
 import pandas as pd
 from datetime import datetime
 

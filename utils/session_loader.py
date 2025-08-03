@@ -1,7 +1,17 @@
+"""Utilities for loading and normalising Garmin session CSV files."""
+
 import pandas as pd
 import io
 
+
 def load_sessions(files):
+    """Return a concatenated dataframe from uploaded CSV ``files``.
+
+    Each file is read into a dataframe, annotated with the original file name
+    and normalised so that a ``Club`` column is always present. Any files that
+    fail to parse are skipped with a printed warning.
+    """
+
     dfs = []
     for file in files:
         try:

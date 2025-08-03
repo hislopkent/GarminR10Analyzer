@@ -1,3 +1,5 @@
+"""Utilities for generating practice feedback summaries using OpenAI."""
+
 import pandas as pd
 import numpy as np
 from openai import OpenAI
@@ -5,7 +7,10 @@ import os
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+
 def analyze_club_stats(df: pd.DataFrame, club: str) -> dict:
+    """Analyse shots for a single club and return issues and an AI summary."""
+
     feedback = []
     club_df = df[df["Club"] == club].copy()
 
@@ -61,6 +66,8 @@ def analyze_club_stats(df: pd.DataFrame, club: str) -> dict:
     }
 
 def summarize_with_ai(club: str, issues: list[str]) -> str:
+    """Ask the OpenAI API to summarise ``issues`` for ``club``."""
+
     if not issues:
         return f"Your {club} data looks solid — no major red flags detected. Nice work!"
 
@@ -81,5 +88,7 @@ def summarize_with_ai(club: str, issues: list[str]) -> str:
         return f"(AI summary failed: {e})"
 
 def analyze_practice_session(df: pd.DataFrame) -> list[dict]:
+    """Generate practice feedback for each club in ``df``."""
+
     clubs = df["Club"].dropna().unique()
     return [analyze_club_stats(df, club) for club in clubs]

@@ -1,12 +1,21 @@
+"""Benchmark comparison page.
+
+For each club, this page compares the user's averages against a set of
+hand-crafted benchmarks inspired by Jon Sherman's practice philosophy. The
+output is a simple table of ✅/❌ ratings to highlight areas that may need
+attention.
+"""
+
 import streamlit as st
 from utils.logger import logger
+
 uploaded_files = st.session_state.get("uploaded_files", [])
 if not uploaded_files:
     st.warning("📤 Please upload CSV files on the home page first.")
     st.stop()
 
-from utils.logger import logger
 logger.info("📄 Page loaded: 2 Benchmark Report")
+
 import pandas as pd
 from utils.benchmarks import get_benchmarks
 

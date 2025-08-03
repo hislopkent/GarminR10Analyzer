@@ -1,4 +1,4 @@
-# ai_feedback.py
+"""Helpers for generating natural language feedback via OpenAI APIs."""
 
 import os
 import openai
@@ -6,6 +6,14 @@ from typing import Dict
 
 
 def generate_ai_summary(club_name, df):
+    """Return a short coaching-style summary for ``club_name``.
+
+    The function calculates a few aggregate statistics for the selected club
+    and feeds them to an OpenAI Assistant.  If the required credentials are not
+    configured the function returns a friendly warning instead of raising an
+    exception.
+    """
+
     shots = df[df["Club"] == club_name]
     if shots.empty:
         return "No data for this club."

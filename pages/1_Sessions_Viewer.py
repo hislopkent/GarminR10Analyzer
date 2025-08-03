@@ -1,13 +1,21 @@
+"""Table-based view of all uploaded Garmin sessions.
+
+This page provides a simple table of all processed shots so that users can
+inspect individual rows.  It is intentionally minimal; heavy analysis and
+visualisation live on other pages.  The sidebar provides navigation links
+and contextual guidance.
+"""
+
 import streamlit as st
 from utils.logger import logger
+
 uploaded_files = st.session_state.get("uploaded_files", [])
 if not uploaded_files:
     st.warning("📤 Please upload CSV files on the home page first.")
     st.stop()
 
-from utils.logger import logger
 logger.info("📄 Page loaded: 1 Sessions Viewer")
-import streamlit as st
+
 import os
 import pandas as pd
 import numpy as np
