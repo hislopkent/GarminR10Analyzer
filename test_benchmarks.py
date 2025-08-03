@@ -26,6 +26,16 @@ def test_driver_case_insensitive():
     result = check_benchmark("driver", stats)
     assert all("✅" in line for line in result)
 
+
+def test_pitching_wedge_alias():
+    """Full club names such as 'Pitching Wedge' should map to PW benchmarks."""
+    stats = {
+        'Smash Factor': 1.26,
+        'Backspin': 9000,
+    }
+    result = check_benchmark("Pitching Wedge", stats)
+    assert all("✅" in line for line in result)
+
 def test_driver_benchmark_mixed():
     stats = {
         'Carry': 210,

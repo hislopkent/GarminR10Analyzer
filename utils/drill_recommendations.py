@@ -43,6 +43,12 @@ def _match_benchmark(club: str) -> Dict[str, float]:
     """Return benchmark dict matching ``club`` by name (case-insensitive)."""
 
     club_lower = club.lower()
+    aliases = {"pitching wedge": "pw", "sand wedge": "sw"}
+    for alias, repl in aliases.items():
+        if alias in club_lower:
+            club_lower = club_lower.replace(alias, repl)
+            break
+
     for name, bench in get_benchmarks().items():
         if name.lower() in club_lower:
             return bench
