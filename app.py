@@ -25,7 +25,7 @@ if st.button("🔓 Logout"):
     st.experimental_rerun()
 
     password = st.text_input("Enter password:", type="password")
-        st.experimental_rerun()
+    st.experimental_rerun()
     elif password:
         st.error("❌ Incorrect password")
     st.stop()
