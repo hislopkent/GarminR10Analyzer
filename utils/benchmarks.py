@@ -33,9 +33,14 @@ def check_benchmark(club_name, stats):
     benchmarks = get_benchmarks()
     result_lines = []
 
+    # Normalize club name for case-insensitive matching. The original
+    # implementation performed a direct substring check which failed for
+    # club names using different capitalization (e.g. "driver" vs
+    # "Driver").
     target_type = None
+    club_name_lower = club_name.lower()
     for key in benchmarks:
-        if key in club_name:
+        if key.lower() in club_name_lower:
             target_type = key
             break
 
