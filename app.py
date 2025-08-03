@@ -56,6 +56,14 @@ def load_state() -> None:
             st.session_state["club_data"] = {}
 
 
+def _rerun() -> None:
+    """Trigger a Streamlit rerun with backward compatibility."""
+    if hasattr(st, "rerun"):
+        st.rerun()
+    else:  # pragma: no cover - Streamlit < 1.24
+        st.experimental_rerun()
+
+
 # Initialize state on first run
 if "uploaded_files" not in st.session_state:
     load_state()
@@ -127,7 +135,7 @@ def remove_file(name: str) -> None:
             else:
                 st.session_state["club_data"] = {}
         persist_state()
-        st.experimental_rerun()
+        _rerun()
 
 
 if st.session_state.get("uploaded_files"):
@@ -144,5 +152,5 @@ if st.session_state.get("uploaded_files"):
         st.session_state.pop("df_all", None)
         st.session_state.pop("club_data", None)
         persist_state()
-        st.experimental_rerun()
+        _rerun()
 
