@@ -92,7 +92,7 @@ else:
 
     @st.cache_data
     def compute_grouped(filtered):
-        return filtered.groupby('Club')[numeric_cols].agg(['mean', 'median', 'std', 'min', 'max']).round(1)
+        return filtered.groupby('Club')[numeric_cols].agg(['mean', 'median', 'std']).round(1)
 
     grouped = compute_grouped(filtered)
     
