@@ -324,7 +324,14 @@ else:
         club_df = filtered[filtered["Club"] == club]
         club_stats = club_df.describe(include="all").T
         numeric_cols = club_stats.select_dtypes(include="number").columns
-        st.dataframe(club_stats.style.format("{:.1f}", subset=numeric_cols))
+        try:
+            numeric_cols = club_stats.select_dtypes(include='number').columns
+            fmt_dict = {col: '{:.1f}' for col in numeric_cols}
+            styled_stats = club_stats.style.format(fmt_dict)
+            st.dataframe(styled_stats, use_container_width=True)
+        except Exception as e:
+            st.error(f'⚠️ Could not style club stats table: {e}')
+            st.dataframe(club_stats, use_container_width=True)
         if show_ai_feedback:
             with st.spinner(f"Analyzing {club}..."):
                 feedback = generate_ai_summary(club, filtered)
