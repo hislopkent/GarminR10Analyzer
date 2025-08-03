@@ -105,19 +105,11 @@ smash_factor = (
 total_shots = len(df_filtered)
 
 if "Face Impact Location" in df_filtered.columns:
-    center_strike_pct = (
-        df_filtered["Face Impact Location"].str.contains(
-            "center", case=False, na=False
-        ).mean()
-        * 100
-    )
+    col = df_filtered["Face Impact Location"].astype(str)
+    center_strike_pct = col.str.contains("center", case=False, na=False).mean() * 100
 elif "Club Face Contact" in df_filtered.columns:
-    center_strike_pct = (
-        df_filtered["Club Face Contact"].str.contains(
-            "center", case=False, na=False
-        ).mean()
-        * 100
-    )
+    col = df_filtered["Club Face Contact"].astype(str)
+    center_strike_pct = col.str.contains("center", case=False, na=False).mean() * 100
 else:
     center_strike_pct = np.nan
 
