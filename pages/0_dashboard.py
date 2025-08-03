@@ -104,6 +104,6 @@ else:
             insights = response.choices[0].message.content
             st.write(insights)
         except Exception as e:
-            st.error(f"Error generating insights: {str(e)}. Check your API key or try again.")
+            st.error(f"Error generating insights: {str(e)}. Check your API key or try again. If quota exceeded, upgrade your OpenAI plan at https://platform.openai.com/account/billing or wait for reset.")
     elif not api_key:
         st.info("Enter your OpenAI API key above to generate AI-powered suggestions on your data (e.g., 'Improve driver smash factor for better distance'). Get a key at openai.com.")
