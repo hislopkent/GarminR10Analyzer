@@ -9,17 +9,17 @@ st.markdown("""
     <style>
         .dataframe {font-size: small; overflow-x: auto;}
         .sidebar .sidebar-content {background-color: #f0f2f6; padding: 10px;}
-        .sidebar a {color: #2ca02c; text-decoration: none;}
-        .sidebar a:hover {background-color: #228B22; text-decoration: underline;}
+        .sidebar a {color: #2ca02c; text-decoration: none; display: block; padding: 5px;}
+        .sidebar a:hover {background-color: #228B22; color: white; text-decoration: none; border-radius: 3px;}
     </style>
 """, unsafe_allow_html=True)
 
-# Consistent sidebar navigation with links
+# Consistent sidebar navigation with single set of links
 st.sidebar.title("Navigation")
 st.sidebar.markdown("""
-- [🏠 Home (Upload CSVs)](/)
-- [📋 Sessions Viewer](/1_Sessions_Viewer)
-- [📊 Dashboard](/0_dashboard)
+- <a href="?" style="color: #2ca02c;">🏠 Home (Upload CSVs)</a>
+- <a href="?page=1_Sessions_Viewer" style="color: #2ca02c;">📋 Sessions Viewer</a>
+- <a href="?page=0_dashboard" style="color: #2ca02c;">📊 Dashboard</a>
 """, unsafe_allow_html=True)
 
 # Conditional guidance
@@ -35,11 +35,11 @@ if df_all is None or df_all.empty:
 else:
     st.subheader("Full Processed Data")
     
-    # 1. Add Session Selector: Filter by session name
+    # Session Selector
     sessions = st.multiselect("Select Sessions to View", df_all['Session'].unique(), default=df_all['Session'].unique())
     filtered = df_all[df_all['Session'].isin(sessions)] if sessions else df_all
     
-    # 2. Add Column Filter/Search: Allow column selection
+    # Column Filter/Search
     columns = st.multiselect("Select Columns to Display", filtered.columns.tolist(), default=filtered.columns.tolist())
     filtered = filtered[columns] if columns else filtered
     
@@ -47,7 +47,7 @@ else:
     st.dataframe(filtered, use_container_width=True)
     st.info("Explore all shots above. Navigate to Home for uploads or Dashboard for summaries.")
     
-    # 3. Export Filtered Data: Download session-specific or column-filtered data
+    # Export Filtered Data
     st.download_button(
         label="Export Filtered Data",
         data=filtered.to_csv(index=False),
@@ -55,7 +55,7 @@ else:
         mime="text/csv"
     )
     
-    # 4. Add Summary Stats Per Session: Small table summarizing each session
+    # Summary Stats Per Session
     if not filtered.empty:
         st.subheader("Summary Stats Per Session")
         session_summary = filtered.groupby('Session').agg({
