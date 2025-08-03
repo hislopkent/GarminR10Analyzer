@@ -48,9 +48,21 @@ else:
         
         df_all = df_all.dropna(subset=numeric_cols, how='any')
         
-        sessions = st.multiselect("Select Sessions", df_all['Session'].unique(), default=df_all['Session'].unique(), help="Sessions are created per day from uploaded CSVs.")
+        session_options = ['All Sessions'] + sorted(df_all['Session'].unique())
+        selected_session = st.selectbox(
+            "Select Session",
+            session_options,
+            help="Sessions are automatically labeled by date. Choose one to view or select 'All Sessions'."
+        )
         clubs = st.multiselect("Select Clubs", df_all['Club'].unique(), default=df_all['Club'].unique())
-        filtered = df_all[df_all['Session'].isin(sessions) & df_all['Club'].isin(clubs)] if sessions and clubs else df_all
+
+        if selected_session != 'All Sessions':
+            filtered = df_all[df_all['Session'] == selected_session]
+        else:
+            filtered = df_all
+
+        if clubs:
+            filtered = filtered[filtered['Club'].isin(clubs)]
         
         if filtered[numeric_cols].dtypes.any() == 'object':
             st.warning("One or more numeric columns contain non-numeric data. Aggregates may be incomplete.")

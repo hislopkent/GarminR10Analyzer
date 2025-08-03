@@ -51,20 +51,13 @@ else:
     - Other columns: `Backspin`, `Sidespin`, `Total Distance`, `Smash Factor`, `Apex Height`, `Attack Angle`
     """)
 
-    def create_session_name(date_series):
-        grouped = date_series.groupby(date_series.dt.date)
-        renamed_sessions = []
-        for day, group in grouped:
-            sorted_times = group.sort_values()
-            renamed_sessions.extend([f"{day} Session 1"] * len(sorted_times))
-        return renamed_sessions
-
     uploaded_files = st.file_uploader("Upload Garmin R10 CSV files", type="csv", accept_multiple_files=True)
 
     if uploaded_files:
         with st.spinner("Processing CSVs..."):
             dfs = []
             total_rows = 0
+            session_counts = {}
             for idx, file in enumerate(uploaded_files):
                 if file.size > 50 * 1024 * 1024:
                     st.warning(f"File {file.name} exceeds 50MB. Skip or split the file.")
@@ -77,6 +70,13 @@ else:
                         continue
                     if 'Date' in df.columns:
                         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                        valid_dates = df['Date'].dt.date.dropna()
+                        if not valid_dates.empty:
+                            session_date = valid_dates.iloc[0]
+                        else:
+                            session_date = datetime.now().date()
+                        session_counts[session_date] = session_counts.get(session_date, 0) + 1
+                        df['Session'] = f"{session_date} Session {session_counts[session_date]}"
                     if 'Club Type' in df.columns:
                         df.rename(
                             columns={
@@ -100,9 +100,6 @@ else:
                 df_all = pd.concat(dfs, ignore_index=True)
                 if 'Date' in df_all.columns:
                     df_all = df_all.dropna(subset=['Date'])
-                    df_all['Session'] = create_session_name(df_all['Date'])
-                    unique_sessions = df_all['Session'].nunique()
-                    st.write(f"Debug: Number of unique sessions created: {unique_sessions}")
                 st.session_state['df_all'] = df_all
                 st.success(f"✅ Loaded {total_rows} shots from {len(dfs)} file(s).")
                 st.dataframe(df_all.head(100), use_container_width=True)
