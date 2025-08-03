@@ -16,6 +16,8 @@ PRACTICE_LOG_FILE = "practice_log.csv"
 # Prepare available drills from recommendations
 AVAILABLE_DRILLS = [rec.drill for rec in _DRILLS.values()]
 
+LOG_COLUMNS = ["Date", "Club", "Session", "Notes", "Drills Completed"]
+
 # Load existing practice log if available
 if os.path.exists(PRACTICE_LOG_FILE):
     try:
@@ -32,13 +34,44 @@ if os.path.exists(PRACTICE_LOG_FILE):
             st.code(preview_text)
         except Exception:
             pass
-        log_df = pd.DataFrame(columns=["Date", "Notes", "Drills Completed"])
+        log_df = pd.DataFrame(columns=LOG_COLUMNS)
 else:
-    log_df = pd.DataFrame(columns=["Date", "Notes", "Drills Completed"])
+    log_df = pd.DataFrame(columns=LOG_COLUMNS)
+
+# Ensure required columns exist (for backward compatibility)
+for col in LOG_COLUMNS:
+    if col not in log_df.columns:
+        log_df[col] = ""
+log_df = log_df[LOG_COLUMNS]
 
 st.subheader("Log a Practice Session")
 with st.form("practice_form"):
     session_date = st.date_input("Date", value=date.today())
+
+    # Dropdowns for club and session ID
+    df_all = st.session_state.get("df_all")
+    club_options = []
+    session_options = []
+    if isinstance(df_all, pd.DataFrame) and not df_all.empty:
+        if "Club" in df_all.columns:
+            club_options = sorted(df_all["Club"].dropna().unique())
+        if "Session" in df_all.columns:
+            session_options = sorted(df_all["Session"].dropna().unique())
+    if not club_options:
+        club_options = sorted(log_df["Club"].dropna().unique())
+    if not session_options:
+        session_options = sorted(log_df["Session"].dropna().unique())
+    club = (
+        st.selectbox("Club", club_options)
+        if club_options
+        else st.text_input("Club")
+    )
+    session_id = (
+        st.selectbox("Session", session_options)
+        if session_options
+        else st.text_input("Session")
+    )
+
     notes = st.text_area("Notes")
     st.markdown("#### Drills")
     drill_checks = {drill: st.checkbox(drill) for drill in AVAILABLE_DRILLS}
@@ -48,6 +81,8 @@ with st.form("practice_form"):
         completed = [drill for drill, done in drill_checks.items() if done]
         new_row = {
             "Date": session_date.isoformat(),
+            "Club": club,
+            "Session": session_id,
             "Notes": notes,
             "Drills Completed": ", ".join(completed),
         }
@@ -60,8 +95,13 @@ with st.form("practice_form"):
 
 if not log_df.empty:
     st.subheader("Practice History")
-    st.dataframe(log_df, use_container_width=True)
-    csv = log_df.to_csv(index=False).encode("utf-8")
+    filter_options = ["All"] + sorted(log_df["Session"].dropna().unique().tolist())
+    session_filter = st.selectbox("Filter by Session", filter_options)
+    display_df = (
+        log_df if session_filter == "All" else log_df[log_df["Session"] == session_filter]
+    )
+    st.dataframe(display_df, use_container_width=True)
+    csv = display_df.to_csv(index=False).encode("utf-8")
     st.download_button("Download CSV", csv, "practice_log.csv", "text/csv")
 else:
     st.info("No practice sessions logged yet.")
