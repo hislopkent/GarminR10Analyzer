@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import openai
 import plotly.express as px
-import os
 
 st.set_page_config(layout="centered")
 st.header("📊 Dashboard – Club Summary")
@@ -38,22 +37,22 @@ if df_all is None or df_all.empty:
     st.warning("No session data uploaded yet. Go to the Home page to upload.")
 else:
     st.subheader("Averages per Club")
-    numeric_cols = ['Carry', 'Backspin', 'Sidespin', 'Total', 'Smash Factor', 'Apex Height', 'Launch Angle', 'Attack Angle']
+    key_cols = ['Carry', 'Sidespin', 'Smash Factor', 'Launch Angle', 'Apex Height', 'Backspin', 'Face to Path', 'Club Path']
     df_all = df_all.copy()
     
-    for col in numeric_cols:
+    for col in key_cols:
         if col in df_all.columns:
             df_all[col] = pd.to_numeric(df_all[col], errors='coerce')
     
-    df_all = df_all.dropna(subset=numeric_cols, how='any')
+    df_all = df_all.dropna(subset=key_cols, how='any')
     
     sessions = st.multiselect("Select Sessions", df_all['Session'].unique(), default=df_all['Session'].unique(), help="Sessions are created per day from uploaded CSVs.")
     clubs = st.multiselect("Select Clubs", df_all['Club'].unique(), default=df_all['Club'].unique())
     filtered = df_all[df_all['Session'].isin(sessions) & df_all['Club'].isin(clubs)] if sessions and clubs else df_all
     
-    if filtered[numeric_cols].dtypes.any() == 'object':
-        st.warning("One or more numeric columns contain non-numeric data. Aggregates may be incomplete.")
-        st.write("Column dtypes:", filtered[numeric_cols].dtypes)
+    if filtered[key_cols].dtypes.any() == 'object':
+        st.warning("One or more key columns contain non-numeric data. Aggregates may be incomplete.")
+        st.write("Column dtypes:", filtered[key_cols].dtypes)
     
     remove_outliers_iqr = st.checkbox("Remove Outliers (based on Carry IQR per club)", value=False)
     remove_contact_outliers = st.checkbox("Remove Fat/Thin Shots (based on Smash Factor, Launch Angle, Backspin, Attack Angle)", value=False)
@@ -91,30 +90,43 @@ else:
         filtered = filtered[~filtered.apply(is_poor_contact, axis=1)]
         st.info("Fat/thin shots removed using thresholds on Smash Factor (poor contact), Launch Angle (high/low), Backspin (extreme), and Attack Angle (too negative for fat). Thresholds are club-specific.")
 
-    grouped = filtered.groupby('Club')[numeric_cols].agg(['mean', 'median', 'std']).round(1)
+    grouped = filtered.groupby('Club')[key_cols].agg(['mean', 'median', 'std']).round(1)
     
     grouped_flat = grouped.copy()
     grouped_flat.columns = [f"{col[0]}_{col[1]}" for col in grouped_flat.columns]
     grouped_flat = grouped_flat.reset_index()
     
-    st.dataframe(grouped_flat, use_container_width=True)
-    
-    st.download_button(
-        label="Download Dashboard Stats",
-        data=grouped_flat.to_csv(index=False),
-        file_name="dashboard_stats.csv",
-        mime="text/csv"
-    )
+    # Styled table with color coding
+    def highlight_key_metrics(s):
+        if s.name == 'Carry_mean':
+            return ['background-color: red' if v < 200 else 'background-color: green' for v in s]  # Driver benchmark example
+        elif s.name == 'Sidespin_mean':
+            return ['background-color: red' if abs(v) > 500 else 'background-color: green' for v in s]
+        elif s.name == 'Smash Factor_mean':
+            return ['background-color: red' if v < 1.3 else 'background-color: green' for v in s]
+        elif s.name == 'Launch Angle_mean':
+            return ['background-color: red' if v < 10 or v > 20 else 'background-color: green' for v in s]  # General range
+        elif s.name == 'Apex Height_mean':
+            return ['background-color: red' if v < 20 or v > 40 else 'background-color: green' for v in s]
+        elif s.name == 'Backspin_mean':
+            return ['background-color: red' if v < 2000 or v > 8000 else 'background-color: green' for v in s]
+        elif s.name == 'Face to Path_mean' or s.name == 'Club Path_mean':
+            return ['background-color: red' if abs(v) > 2 else 'background-color: green' for v in s]
+        return ['background-color: white' for _ in s]
+
+    styled_table = grouped_flat.style.apply(highlight_key_metrics, subset=[f'{metric}_mean' for metric in key_cols])
+    st.dataframe(styled_table, use_container_width=True)
     
     st.markdown("""
     ### Statistic Explanations
     - **Mean**: <span title="Average performance; e.g., mean Carry shows typical distance—aim to increase for better range.">The average value</span>.
     - **Median**: <span title="Middle value, less affected by poor shots; compare to mean to spot extremes.">The middle value</span>.
     - **Std**: <span title="Variability; low std = consistent shots (e.g., Carry std <10 yards is tight grouping).">Measures spread</span>.
+    Color coding: Green = within typical benchmarks, Red = outside (based on general golf standards; customize if needed).
     """, unsafe_allow_html=True)
     
     if not grouped_flat.empty:
-        metric = st.selectbox("Select Metric for Chart", numeric_cols, index=0)
+        metric = st.selectbox("Select Metric for Chart", key_cols, index=0)
         chart_data = grouped_flat[['Club', f'{metric}_mean', f'{metric}_median', f'{metric}_std']]
         chart_data = chart_data.melt(id_vars=['Club'], value_vars=[f'{metric}_mean', f'{metric}_median'], var_name='Stat', value_name='Value')
         chart_data['Std'] = chart_data.apply(lambda row: grouped_flat.loc[grouped_flat['Club'] == row['Club'], f'{metric}_std'].values[0] if row['Stat'] == f'{metric}_mean' else 0, axis=1)
@@ -136,12 +148,15 @@ else:
         try:
             client = openai.OpenAI(api_key=api_key)
             thread = client.beta.threads.create()
-            # Send a sample of filtered data (e.g., first 10 rows) along with grouped stats
-            sample_data = filtered.head(10).to_string()
+            # Send all filtered data if small, else sample
+            if len(filtered) < 200:
+                data_str = filtered.to_string()
+            else:
+                data_str = filtered.sample(200).to_string()
             message = client.beta.threads.messages.create(
                 thread_id=thread.id,
                 role="user",
-                content=f"Raw shot data sample:\n{sample_data}\nAggregated averages per club (mean, median, std for Carry, Backspin, Sidespin, Total, Smash Factor, Apex Height, Launch Angle, Attack Angle):\n{grouped.to_string()}\nProvide suggestions, comments, and recommendations for improving performance. Focus on {focus if focus else 'general'} aspects like fat/thin shots (low Smash Factor, extreme Launch Angle/Backspin), outliers, consistency, and typical golf benchmarks (e.g., driver carry >200 yards, irons Smash Factor >1.3), based on the actual values in the raw data and the aggregated stats."
+                content=f"Full filtered shot data:\n{data_str}\nAggregated averages per club (mean, median, std for Carry, Sidespin, Smash Factor, Launch Angle, Apex Height, Backspin, Face to Path, Club Path):\n{grouped.to_string()}\nProvide suggestions, comments, and recommendations for improving performance on each club. Focus on {focus if focus else 'general'} aspects like fat/thin shots (low Smash Factor, extreme Launch Angle/Backspin), outliers, consistency, and typical golf benchmarks (e.g., driver carry >200 yards, irons Smash Factor >1.3), based on the actual values in the full data and the aggregated stats."
             )
             run = client.beta.threads.runs.create(
                 thread_id=thread.id,
