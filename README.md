@@ -59,6 +59,19 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+### 🐳 Docker Build (Optional)
+
+If you prefer to run the app in a container, build the image with Docker's
+cache disabled to avoid occasional `lease <id>: not found` errors from
+BuildKit:
+
+```bash
+./build.sh
+```
+
+This script wraps `docker build --no-cache` so no cached layers are reused
+during the build.
+
 ### ☁️ Deploy to Render
 1. Add `PASSWORD` as environment variable
 2. Deploy using `render.yaml` + Dockerfile
