@@ -21,6 +21,10 @@ A Streamlit-based app for analyzing and improving your golf performance using da
 - Per-club report cards with ✅ / ❌ ratings
 - Built-in feedback for practice priorities
 
+### 📝 Practice Log (NEW)
+- Track session notes and completed drills
+- Save logs locally and download as CSV
+
 ### 🧠 AI Insights (Optional)
 - Requires `OPENAI_API_KEY` and `OPENAI_ASSISTANT_ID` environment variables
 - Generates coaching-style analysis and per-club summaries
