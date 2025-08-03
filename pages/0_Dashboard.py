@@ -185,7 +185,9 @@ else:
     if show_ai_feedback:
         st.info("Generating personalized feedback per club based on your session data...")
 
-    openai.api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("openai_key")
+    api_key = os.getenv("OPENAI_API_KEY")
+    assistant_id = os.getenv("OPENAI_ASSISTANT_ID")
+    client = openai.OpenAI(api_key=api_key) if api_key else None
 
     def generate_ai_summary(club_name, df):
         shots = df[df["Club"] == club_name]
@@ -212,16 +214,29 @@ You're a golf performance coach trained in Jon Sherman's Four Foundations. I use
 Explain what this means for my consistency and what to do in practice. Be specific and encouraging. Mention if anything is a standout or weak point.
 """
 
+        if not client or not assistant_id:
+            return "⚠️ AI credentials missing."
         try:
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.6,
-                max_tokens=300,
+            thread = client.beta.threads.create()
+            client.beta.threads.messages.create(
+                thread_id=thread.id,
+                role="user",
+                content=prompt
             )
-            return response.choices[0].message["content"]
+            run = client.beta.threads.runs.create(
+                thread_id=thread.id,
+                assistant_id=assistant_id
+            )
+            import time
+            while run.status not in ["completed", "failed", "cancelled", "expired"]:
+                time.sleep(1)
+                run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+            if run.status == "completed":
+                messages = client.beta.threads.messages.list(thread_id=thread.id)
+                return messages.data[0].content[0].text.value
+            return f"⚠️ AI summary error: {run.status}"
         except Exception as e:
-            return f"\u26a0\ufe0f AI summary error: {str(e)}"
+            return f"⚠️ AI summary error: {str(e)}"
 
     for club in sorted(filtered["Club"].unique()):
         st.subheader(f"\U0001F50E {club}")
@@ -237,10 +252,10 @@ Explain what this means for my consistency and what to do in practice. Be specif
         enable_ai = st.checkbox("Enable AI Insights")
         if enable_ai:
             focus = st.text_input("AI Focus (e.g., 'irons only' or 'distance improvement')", "")
-            api_key = os.environ.get("OPENAI_API_KEY")
-            assistant_id = os.environ.get("ASSISTANT_ID")
+            api_key = os.getenv("OPENAI_API_KEY")
+            assistant_id = os.getenv("OPENAI_ASSISTANT_ID")
             if not api_key or not assistant_id:
-                st.warning("OpenAI API Key or Assistant ID not set in Render environment variables. Set OPENAI_API_KEY and ASSISTANT_ID in your Render dashboard.")
+                st.warning("OpenAI API Key or Assistant ID not set in Render environment variables. Set OPENAI_API_KEY and OPENAI_ASSISTANT_ID in your Render dashboard.")
             elif st.button("Generate AI Insights"):
                 try:
                     client = openai.OpenAI(api_key=api_key)
