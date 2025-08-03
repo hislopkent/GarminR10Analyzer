@@ -78,8 +78,9 @@ else:
             backspin = row['Backspin']
             attack = row['Attack Angle']
             
+            # Updated benchmarks from search
             if 'Driver' in club:
-                return smash < 1.4 or launch < 8 or launch > 16 or backspin < 1500 or backspin > 3500 or attack < -2 or attack > 5
+                return smash < 1.45 or launch < 10 or launch > 15 or backspin < 2000 or backspin > 3000 or attack < -2 or attack > 5
             elif 'Iron' in club:
                 return smash < 1.3 or launch < 10 or launch > 22 or backspin < 4000 or backspin > 9000 or attack < -5 or attack > 0
             elif 'Wedge' in club:
@@ -90,7 +91,7 @@ else:
         filtered = filtered[~filtered.apply(is_poor_contact, axis=1)]
         st.info("Fat/thin shots removed using thresholds on Smash Factor (poor contact), Launch Angle (high/low), Backspin (extreme), and Attack Angle (too negative for fat). Thresholds are club-specific.")
 
-    grouped = filtered.groupby('Club')[key_cols].agg(['mean', 'median', 'std']).round(1)
+    grouped = filtered.groupby('Club')[key_cols].agg(['mean', 'median', 'std', 'min', 'max']).round(1)
     
     grouped_flat = grouped.copy()
     grouped_flat.columns = [f"{col[0]}_{col[1]}" for col in grouped_flat.columns]
@@ -99,13 +100,13 @@ else:
     # Styled table with color coding
     def highlight_key_metrics(s):
         if s.name == 'Carry_mean':
-            return ['background-color: red' if v < 200 else 'background-color: green' for v in s]  # Driver benchmark example
+            return ['background-color: red' if v < 200 else 'background-color: green' for v in s]
         elif s.name == 'Sidespin_mean':
             return ['background-color: red' if abs(v) > 500 else 'background-color: green' for v in s]
         elif s.name == 'Smash Factor_mean':
             return ['background-color: red' if v < 1.3 else 'background-color: green' for v in s]
         elif s.name == 'Launch Angle_mean':
-            return ['background-color: red' if v < 10 or v > 20 else 'background-color: green' for v in s]  # General range
+            return ['background-color: red' if v < 10 or v > 20 else 'background-color: green' for v in s]
         elif s.name == 'Apex Height_mean':
             return ['background-color: red' if v < 20 or v > 40 else 'background-color: green' for v in s]
         elif s.name == 'Backspin_mean':
@@ -117,11 +118,18 @@ else:
     styled_table = grouped_flat.style.apply(highlight_key_metrics, subset=[f'{metric}_mean' for metric in key_cols])
     st.dataframe(styled_table, use_container_width=True)
     
+    # Average Carry per club (post-filters)
+    st.subheader("Average Carry Distance per Club (Outliers Removed)")
+    avg_carry_per_club = grouped_flat[['Club', 'Carry_mean']]
+    avg_carry_per_club.columns = ['Club', 'Avg Carry (Yards)']
+    st.dataframe(avg_carry_per_club, use_container_width=True)
+    
     st.markdown("""
     ### Statistic Explanations
-    - **Mean**: <span title="Average performance; e.g., mean Carry shows typical distance—aim to increase for better range.">The average value</span>.
-    - **Median**: <span title="Middle value, less affected by poor shots; compare to mean to spot extremes.">The middle value</span>.
-    - **Std**: <span title="Variability; low std = consistent shots (e.g., Carry std <10 yards is tight grouping).">Measures spread</span>.
+    - **Mean**: Average performance; e.g., mean Carry shows typical distance—aim to increase for better range.
+    - **Median**: Middle value, less affected by poor shots; compare to mean to spot extremes.
+    - **Std**: Variability; low std = consistent shots (e.g., Carry std <10 yards is tight grouping).
+    - **Min/Max**: Range of values; useful for spotting extremes.
     Color coding: Green = within typical benchmarks, Red = outside (based on general golf standards; customize if needed).
     """, unsafe_allow_html=True)
     
@@ -156,7 +164,7 @@ else:
             message = client.beta.threads.messages.create(
                 thread_id=thread.id,
                 role="user",
-                content=f"Full filtered shot data:\n{data_str}\nAggregated averages per club (mean, median, std for Carry, Sidespin, Smash Factor, Launch Angle, Apex Height, Backspin, Face to Path, Club Path):\n{grouped.to_string()}\nProvide suggestions, comments, and recommendations for improving performance on each club. Focus on {focus if focus else 'general'} aspects like fat/thin shots (low Smash Factor, extreme Launch Angle/Backspin), outliers, consistency, and typical golf benchmarks (e.g., driver carry >200 yards, irons Smash Factor >1.3), based on the actual values in the full data and the aggregated stats."
+                content=f"Full filtered shot data:\n{data_str}\nAggregated averages per club (mean, median, std, min, max for Carry, Sidespin, Smash Factor, Launch Angle, Apex Height, Backspin, Face to Path, Club Path):\n{grouped.to_string()}\nProvide suggestions, comments, and recommendations for improving performance on each club. Focus on {focus if focus else 'general'} aspects like fat/thin shots (low Smash Factor, extreme Launch Angle/Backspin), outliers, consistency, and typical golf benchmarks (e.g., driver carry >200 yards, irons Smash Factor >1.3), based on the actual values in the full data and the aggregated stats."
             )
             run = client.beta.threads.runs.create(
                 thread_id=thread.id,
