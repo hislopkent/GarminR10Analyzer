@@ -10,11 +10,12 @@ def generate_ai_summary(club_name, df):
     if shots.empty:
         return "No data for this club."
 
-    carry = shots["Carry"].mean()
+    carry_col = "Carry Distance" if "Carry Distance" in shots.columns else "Carry"
+    carry = shots[carry_col].mean()
     smash = shots["Smash Factor"].mean()
     launch = shots["Launch Angle"].mean()
     backspin = shots["Backspin"].mean()
-    std_dev = shots["Carry"].std()
+    std_dev = shots[carry_col].std()
     shot_count = len(shots)
 
     prompt = f"""
@@ -93,11 +94,12 @@ def generate_ai_batch_summaries(df) -> Dict[str, str]:
         shots = df[df["Club"] == club]
         if shots.empty:
             continue
-        carry = shots["Carry"].mean()
+        carry_col = "Carry Distance" if "Carry Distance" in shots.columns else "Carry"
+        carry = shots[carry_col].mean()
         smash = shots["Smash Factor"].mean()
         launch = shots["Launch Angle"].mean()
         backspin = shots["Backspin"].mean()
-        std_dev = shots["Carry"].std()
+        std_dev = shots[carry_col].std()
         shot_count = len(shots)
         section = (
             f"{club}\n"

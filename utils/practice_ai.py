@@ -12,18 +12,23 @@ def analyze_club_stats(df: pd.DataFrame, club: str) -> dict:
     if club_df.empty:
         return {"club": club, "issues": ["No data"], "summary": "No data available."}
 
-    # Clean and cast
+    # Clean and cast existing columns only
     for col in ["Carry Distance", "Launch Angle", "Spin Rate", "Smash Factor", "Offline"]:
-        club_df[col] = pd.to_numeric(club_df[col], errors="coerce")
+        if col in club_df.columns:
+            club_df[col] = pd.to_numeric(club_df[col], errors="coerce")
 
-    avg_smash = club_df["Smash Factor"].mean()
-    avg_launch = club_df["Launch Angle"].mean()
-    avg_spin = club_df["Spin Rate"].mean()
-    avg_carry = club_df["Carry Distance"].mean()
-    avg_offline = club_df["Offline"].mean()
-    std_carry = club_df["Carry Distance"].std()
-    left_bias = (club_df["Offline"] < 0).mean() * 100
-    right_bias = (club_df["Offline"] > 0).mean() * 100
+    avg_smash = club_df["Smash Factor"].mean() if "Smash Factor" in club_df else np.nan
+    avg_launch = club_df["Launch Angle"].mean() if "Launch Angle" in club_df else np.nan
+    avg_spin = club_df["Spin Rate"].mean() if "Spin Rate" in club_df else np.nan
+    avg_carry = club_df["Carry Distance"].mean() if "Carry Distance" in club_df else np.nan
+    avg_offline = club_df["Offline"].mean() if "Offline" in club_df else np.nan
+    std_carry = club_df["Carry Distance"].std() if "Carry Distance" in club_df else np.nan
+    left_bias = (
+        (club_df["Offline"] < 0).mean() * 100 if "Offline" in club_df else 0
+    )
+    right_bias = (
+        (club_df["Offline"] > 0).mean() * 100 if "Offline" in club_df else 0
+    )
 
     # Rules
     if avg_smash < 1.2:
