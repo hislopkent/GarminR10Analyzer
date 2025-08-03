@@ -18,26 +18,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Sidebar navigation with buttons
+# Sidebar navigation with selectbox for cleaner look
 st.sidebar.title("Navigation")
-pages = {
-    "🏠 Home (Upload CSVs)": "app.py",
-    "📋 Sessions Viewer": "pages/1_Sessions_Viewer.py",
-    "📊 Dashboard": "pages/0_dashboard.py"
-}
+page = st.sidebar.selectbox("Select Page", ["🏠 Home (Upload CSVs)", "📋 Sessions Viewer", "📊 Dashboard"])
 
-# Determine current page for active styling
-current_page = st.session_state.get("current_page", "app.py")
-
-# Navigation buttons
-for label, page in pages.items():
-    if st.sidebar.button(label, key=page, help=f"Go to {label.split(' (')[0]} page"):
-        st.session_state["current_page"] = page
-        st.switch_page(page)
+if page == "🏠 Home (Upload CSVs)":
+    pass  # Home content below
+elif page == "📋 Sessions Viewer":
+    st.switch_page("pages/1_Sessions_Viewer.py")
+elif page == "📊 Dashboard":
+    st.switch_page("pages/0_dashboard.py")
 
 # Conditional guidance based on data
 if 'df_all' not in st.session_state or st.session_state['df_all'].empty:
-    st.sidebar.warning("Upload data on the Home page to enable all features.")
+    st.sidebar.warning("Upload data to enable all features.")
 else:
     st.sidebar.success("Data loaded. Explore sessions or dashboard!")
 
@@ -120,7 +114,6 @@ if 'df_all' in st.session_state:
 if 'df_all' in st.session_state:
     if os.path.exists("pages/1_Sessions_Viewer.py"):
         if st.button("View Full Sessions"):
-            st.session_state["current_page"] = "pages/1_Sessions_Viewer.py"
             st.switch_page("pages/1_Sessions_Viewer.py")
     else:
         st.error("Page '1_Sessions_Viewer.py' not found. Please ensure the file exists in the pages/ directory.")
