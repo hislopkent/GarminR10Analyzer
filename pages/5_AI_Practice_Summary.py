@@ -15,6 +15,18 @@ st.title("🧠 AI Practice Summary")
 df = st.session_state.get("session_df")
 
 if df is not None and not df.empty:
+    df = df.copy()
+    for col in [
+        "Carry Distance",
+        "Carry",
+        "Smash Factor",
+        "Launch Angle",
+        "Backspin",
+        "Spin Rate",
+        "Offline",
+    ]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
     logger.info("Analyzing session with AI practice engine")
     results = analyze_practice_session(df)
 

@@ -18,7 +18,10 @@ if "session_df" not in st.session_state or st.session_state["session_df"].empty:
     st.info("Please upload session files from the Home page.")
     st.stop()
 
-df = st.session_state["session_df"]
+df = st.session_state["session_df"].copy()
+for col in ["Carry Distance", "Carry", "Smash Factor", "Launch Angle", "Backspin"]:
+    if col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 club_list = sorted(df["Club"].dropna().unique())
 selected_club = st.selectbox("Select a club for feedback", club_list)
 

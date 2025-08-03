@@ -89,6 +89,11 @@ club_list = sorted(df_filtered["Club"].dropna().unique())
 # Display key metrics for the filtered sessions
 st.subheader("Key Metrics")
 
+# Guard against non-numeric strings in metric columns
+for col in ["Carry Distance", "Carry", "Smash Factor"]:
+    if col in df_filtered.columns:
+        df_filtered[col] = pd.to_numeric(df_filtered[col], errors="coerce")
+
 if "Carry Distance" in df_filtered.columns:
     avg_carry = df_filtered["Carry Distance"].mean()
 elif "Carry" in df_filtered.columns:

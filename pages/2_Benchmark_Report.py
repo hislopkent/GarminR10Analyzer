@@ -30,12 +30,16 @@ benchmarks = get_benchmarks()
 
 def compare_to_benchmark(club, club_df):
     result = {"Club": club}
-    club_stats = club_df.describe().T
 
     bmark = benchmarks.get(club)
     if not bmark:
         result["Note"] = "No benchmark available"
         return result
+
+    club_df = club_df.copy()
+    for col in ["Carry Distance", "Carry", "Smash Factor", "Launch Angle", "Backspin"]:
+        if col in club_df.columns:
+            club_df[col] = pd.to_numeric(club_df[col], errors="coerce")
 
     for metric, target in bmark.items():
         col = metric
@@ -44,7 +48,7 @@ def compare_to_benchmark(club, club_df):
                 col = "Carry Distance"
             else:
                 continue
-        value = pd.to_numeric(club_df[col], errors="coerce").mean()
+        value = club_df[col].mean()
         if isinstance(target, tuple):
             result[metric] = "✅" if target[0] <= value <= target[1] else "❌"
         else:
