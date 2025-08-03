@@ -69,9 +69,3 @@ Ensure your CSV contains these columns (from Garmin R10 export):
 - `Smash Factor`, `Backspin`, `Launch Angle`, etc.
 
 ---
-
-## 📚 Inspired By
-
-- [Jon Sherman – Practical Golf](https://practical-golf.com)
-- *The Four Foundations of Golf*
-- ShotMetrics-style coaching summaries
