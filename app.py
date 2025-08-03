@@ -13,6 +13,7 @@ uploaded_files = st.file_uploader(
 if uploaded_files:
     st.session_state["uploaded_files"] = uploaded_files
     logger.info(f"{len(uploaded_files)} files uploaded and stored in session state")
-    st.experimental_rerun()
+    st.success(f"✅ {len(uploaded_files)} file(s) uploaded. Navigate to any page to begin.")
 else:
     st.session_state.pop("uploaded_files", None)
+    st.info("📤 Upload files here to begin.")
