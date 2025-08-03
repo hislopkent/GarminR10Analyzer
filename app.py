@@ -22,17 +22,17 @@ else:
         <style>
             .dataframe {font-size: small; overflow-x: auto;}
             .sidebar .sidebar-content {background-color: #f0f2f6; padding: 10px;}
-            .sidebar a {color: #2ca02c; text-decoration: none; display: block; padding: 5px;}
-            .sidebar a:hover {background-color: #228B22; color: white; text-decoration: none; border-radius: 3px;}
+            .sidebar a {color: #2ca02c; text-decoration: none;}
+            .sidebar a:hover {background-color: #228B22; text-decoration: underline;}
         </style>
     """, unsafe_allow_html=True)
 
-    # Consistent sidebar navigation with single set of links
+    # Consistent sidebar navigation with links
     st.sidebar.title("Navigation")
     st.sidebar.markdown("""
-    - <a href="?" style="color: #2ca02c;">🏠 Home (Upload CSVs)</a>
-    - <a href="?page=1_Sessions_Viewer" style="color: #2ca02c;">📋 Sessions Viewer</a>
-    - <a href="?page=0_dashboard" style="color: #2ca02c;">📊 Dashboard</a>
+    - [🏠 Home (Upload CSVs)](/)
+    - [📋 Sessions Viewer](/1_Sessions_Viewer)
+    - [📊 Dashboard](/0_dashboard)
     """, unsafe_allow_html=True)
 
     # Conditional guidance based on data
@@ -52,15 +52,12 @@ else:
     """)
 
     def create_session_name(date_series):
-        sessions = []
-        prev_time = None
-        session_counter = 1
-        for current_time in date_series.sort_values():
-            if prev_time and (current_time - prev_time).seconds > 1800:  # >30 min gap = new session
-                session_counter += 1
-            sessions.append(f"{current_time.date()} Session {session_counter}")
-            prev_time = current_time
-        return sessions
+        grouped = date_series.groupby(date_series.dt.date)
+        renamed_sessions = []
+        for day, group in grouped:
+            sorted_times = group.sort_values()
+            renamed_sessions.extend([f"{day} Session 1"] * len(sorted_times))
+        return renamed_sessions
 
     uploaded_files = st.file_uploader("Upload Garmin R10 CSV files", type="csv", accept_multiple_files=True)
 
@@ -74,33 +71,16 @@ else:
                     continue
                 try:
                     df = pd.read_csv(file)
-                    required_cols = ['Date', 'Club Type', 'Carry Distance', 'Backspin', 'Sidespin', 'Total Distance', 'Smash Factor', 'Apex Height']
-                    missing = [col for col in required_cols if col not in df.columns]
-                    if missing:
-                        st.error(f"Missing columns in {file.name}: {missing}. File skipped.")
+                    required_cols = ['Date', 'Club Type', 'Carry Distance']
+                    if not all(col in df.columns for col in required_cols):
+                        st.error(f"CSV {file.name} missing required columns: {required_cols}. File skipped.")
                         continue
-                    # Standardize column names
-                    df.columns = [col.strip().title() for col in df.columns]
                     if 'Date' in df.columns:
                         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
                     if 'Club Type' in df.columns:
-                        df.rename(columns={
-                            'Club Type': 'Club',
-                            'Carry Distance': 'Carry',
-                            'Total Distance': 'Total',
-                            'Backspin': 'Backspin',
-                            'Sidespin': 'Sidespin',
-                            'Smash Factor': 'Smash Factor',
-                            'Apex Height': 'Apex Height'
-                        }, inplace=True)
-                        for col in ['Carry', 'Total', 'Backspin', 'Sidespin', 'Smash Factor', 'Apex Height']:
-                            df[col] = pd.to_numeric(df[col], errors='coerce')
-                    # Initial outlier filtering
-                    df = df[(df['Carry'] > 30) & (df['Carry'] < 400)]
-                    Q1 = df['Carry'].quantile(0.25)
-                    Q3 = df['Carry'].quantile(0.75)
-                    IQR = Q3 - Q1
-                    df = df[(df['Carry'] >= Q1 - 1.5 * IQR) & (df['Carry'] <= Q3 + 1.5 * IQR)]
+                        df.rename(columns={'Club Type': 'Club', 'Carry Distance': 'Carry', 'Total Distance': 'Total'}, inplace=True)
+                        df['Carry'] = pd.to_numeric(df['Carry'], errors='coerce')
+                        df['Total'] = pd.to_numeric(df['Total'], errors='coerce')
                     dfs.append(df)
                     total_rows += len(df)
                     st.progress((idx + 1) / len(uploaded_files))
