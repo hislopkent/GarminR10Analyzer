@@ -22,20 +22,22 @@ else:
         <style>
             .dataframe {font-size: small; overflow-x: auto;}
             .sidebar .sidebar-content {background-color: #f0f2f6; padding: 10px;}
-            .sidebar a {color: #2ca02c; text-decoration: none;}
-            .sidebar a:hover {background-color: #228B22; text-decoration: underline;}
+            .sidebar a {color: #2ca02c; text-decoration: none; display: block; padding: 5px;}
+            .sidebar a:hover {background-color: #228B22; color: white; text-decoration: none; border-radius: 3px;}
         </style>
     """, unsafe_allow_html=True)
 
-    # Consistent sidebar navigation with links, disable Dashboard until data loaded
+    # Consistent sidebar navigation with single set of links
     st.sidebar.title("Navigation")
     st.sidebar.markdown("""
-    - [🏠 Home (Upload CSVs)](/)
-    - [📋 Sessions Viewer](/1_Sessions_Viewer)
-    - [📊 Dashboard](/0_dashboard)
+    - <a href="?" style="color: #2ca02c;">🏠 Home (Upload CSVs)</a>
+    - <a href="?page=1_Sessions_Viewer" style="color: #2ca02c;">📋 Sessions Viewer</a>
+    - <a href="?page=0_dashboard" style="color: #2ca02c;">📊 Dashboard</a>
     """, unsafe_allow_html=True)
+
+    # Conditional guidance based on data
     if 'df_all' not in st.session_state or st.session_state['df_all'].empty:
-        st.sidebar.markdown('<style>.sidebar a[href="/0_dashboard"] {pointer-events: none; color: gray;}</style>', unsafe_allow_html=True)
+        st.sidebar.warning("Upload data to enable all features.")
     else:
         st.sidebar.success("Data loaded. Explore sessions or dashboard!")
 
@@ -94,7 +96,7 @@ else:
                         for col in ['Carry', 'Total', 'Backspin', 'Sidespin', 'Smash Factor', 'Apex Height']:
                             df[col] = pd.to_numeric(df[col], errors='coerce')
                     # Initial outlier filtering
-                    df = df[(df['Carry'] > 30) & (df['Carry'] < 400)]  # Basic range filter
+                    df = df[(df['Carry'] > 30) & (df['Carry'] < 400)]
                     Q1 = df['Carry'].quantile(0.25)
                     Q3 = df['Carry'].quantile(0.75)
                     IQR = Q3 - Q1
