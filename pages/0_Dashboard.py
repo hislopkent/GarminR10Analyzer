@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas as pd
+import osimport streamlit as stPASSWORD = os.environ.get("PASSWORD") or "demo123"if "authenticated" not in st.session_state:    st.session_state["authenticated"] = Falseif not st.session_state["authenticated"]:    st.title("🔒 Protected App")    password = st.text_input("Enter password:", type="password")    if password == PASSWORD:        st.session_state["authenticated"] = True        st.experimental_rerun()    elif password:        st.error("❌ Incorrect password")    st.stop()# Logout buttonif st.button("🔓 Logout"):    st.session_state["authenticated"] = False    st.experimental_rerun()import pandas as pd
 import numpy as np
 import openai
 import plotly.express as px
