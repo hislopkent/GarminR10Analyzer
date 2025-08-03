@@ -14,7 +14,7 @@ st.markdown("""
         .dataframe {font-size: small; overflow-x: auto;}
         .sidebar .sidebar-content {background-color: #f0f2f6; padding: 10px;}
         .sidebar a {color: #2ca02c; text-decoration: none;}
-        .sidebar a:hover {color: #228B22; text-decoration: underline;}
+        .sidebar a:hover {background-color: #228B22; text-decoration: underline;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -57,7 +57,6 @@ if uploaded_files:
         dfs = []
         total_rows = 0
         for idx, file in enumerate(uploaded_files):
-            # Increased limit to 50MB
             if file.size > 50 * 1024 * 1024:
                 st.warning(f"File {file.name} exceeds 50MB. Skip or split the file.")
                 continue
