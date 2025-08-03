@@ -89,6 +89,10 @@ def summarize_with_ai(club: str, issues: list[str]) -> str:
 
 def analyze_practice_session(df: pd.DataFrame) -> list[dict]:
     """Generate practice feedback for each club in ``df``."""
-
+    # ``df`` may come from arbitrary CSVs.  Guard against the ``Club`` column
+    # being missing to avoid ``KeyError``s when the caller supplies malformed
+    # data.
+    if "Club" not in df.columns:
+        return []
     clubs = df["Club"].dropna().unique()
     return [analyze_club_stats(df, club) for club in clubs]

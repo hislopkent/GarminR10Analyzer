@@ -87,15 +87,23 @@ def recommend_drills(df: pd.DataFrame) -> Dict[str, List[Recommendation]]:
         wedge_keywords = ["wedge", "pw", "sw", "gw", "lw", "aw"]
         is_wedge = any(keyword in club_lower for keyword in wedge_keywords)
 
-        if bench.get("Smash Factor") is not None:
+        # Work on a copy and coerce relevant columns to numeric to avoid
+        # ``TypeError`` when the source data contains strings.
+        club_df = club_df.copy()
+        for col in ["Smash Factor", "Carry Distance", "Launch Angle", "Backspin"]:
+            if col in club_df.columns:
+                club_df[col] = pd.to_numeric(club_df[col], errors="coerce")
+
+        if bench.get("Smash Factor") is not None and "Smash Factor" in club_df.columns:
             if club_df["Smash Factor"].min() < bench["Smash Factor"]:
                 recs.append(_DRILLS["low_smash"])
 
-        carry_std = club_df["Carry Distance"].std(ddof=0)
-        if pd.notna(carry_std) and carry_std > 8:
-            recs.append(_DRILLS["inconsistent_carry"])
+        if "Carry Distance" in club_df.columns:
+            carry_std = club_df["Carry Distance"].std(ddof=0)
+            if pd.notna(carry_std) and carry_std > 8:
+                recs.append(_DRILLS["inconsistent_carry"])
 
-        if bench.get("Launch Angle") is not None:
+        if bench.get("Launch Angle") is not None and "Launch Angle" in club_df.columns:
             mean_launch = club_df["Launch Angle"].mean()
             low, high = bench["Launch Angle"]
             if mean_launch < low or mean_launch > high:
@@ -106,7 +114,10 @@ def recommend_drills(df: pd.DataFrame) -> Dict[str, List[Recommendation]]:
                 mean_launch = club_df["Launch Angle"].mean()
                 if mean_launch > 40:
                     recs.append(_DRILLS["high_wedge_launch"])
-            if bench.get("Backspin") is not None and "Backspin" in club_df.columns:
+            if (
+                bench.get("Backspin") is not None
+                and "Backspin" in club_df.columns
+            ):
                 mean_spin = club_df["Backspin"].mean()
                 _, high_spin = bench["Backspin"]
                 if mean_spin > high_spin:

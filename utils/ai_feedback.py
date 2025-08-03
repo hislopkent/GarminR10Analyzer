@@ -4,6 +4,8 @@ import os
 import openai
 from typing import Dict
 
+import pandas as pd
+
 
 def generate_ai_summary(club_name, df):
     """Return a short coaching-style summary for ``club_name``.
@@ -19,11 +21,20 @@ def generate_ai_summary(club_name, df):
         return "No data for this club."
 
     carry_col = "Carry Distance" if "Carry Distance" in shots.columns else "Carry"
-    carry = shots[carry_col].mean()
-    smash = shots["Smash Factor"].mean()
-    launch = shots["Launch Angle"].mean()
-    backspin = shots["Backspin"].mean()
-    std_dev = shots[carry_col].std()
+    shots = shots.copy()
+    # Coerce numeric columns to floats; missing columns result in NaN values so
+    # that formatting below does not raise ``TypeError``.
+    if carry_col in shots.columns:
+        shots[carry_col] = pd.to_numeric(shots[carry_col], errors="coerce")
+    for col in ["Smash Factor", "Launch Angle", "Backspin"]:
+        if col in shots.columns:
+            shots[col] = pd.to_numeric(shots[col], errors="coerce")
+
+    carry = shots[carry_col].mean() if carry_col in shots.columns else float("nan")
+    smash = shots["Smash Factor"].mean() if "Smash Factor" in shots.columns else float("nan")
+    launch = shots["Launch Angle"].mean() if "Launch Angle" in shots.columns else float("nan")
+    backspin = shots["Backspin"].mean() if "Backspin" in shots.columns else float("nan")
+    std_dev = shots[carry_col].std() if carry_col in shots.columns else float("nan")
     shot_count = len(shots)
 
     prompt = f"""
@@ -83,6 +94,9 @@ def generate_ai_batch_summaries(df) -> Dict[str, str]:
         are missing or an error occurs, each club maps to an error message.
     """
 
+    if "Club" not in df.columns:
+        return {}
+
     clubs = df["Club"].unique().tolist()
     if not clubs:
         return {}
@@ -103,11 +117,17 @@ def generate_ai_batch_summaries(df) -> Dict[str, str]:
         if shots.empty:
             continue
         carry_col = "Carry Distance" if "Carry Distance" in shots.columns else "Carry"
-        carry = shots[carry_col].mean()
-        smash = shots["Smash Factor"].mean()
-        launch = shots["Launch Angle"].mean()
-        backspin = shots["Backspin"].mean()
-        std_dev = shots[carry_col].std()
+        shots = shots.copy()
+        if carry_col in shots.columns:
+            shots[carry_col] = pd.to_numeric(shots[carry_col], errors="coerce")
+        for col in ["Smash Factor", "Launch Angle", "Backspin"]:
+            if col in shots.columns:
+                shots[col] = pd.to_numeric(shots[col], errors="coerce")
+        carry = shots[carry_col].mean() if carry_col in shots.columns else float("nan")
+        smash = shots["Smash Factor"].mean() if "Smash Factor" in shots.columns else float("nan")
+        launch = shots["Launch Angle"].mean() if "Launch Angle" in shots.columns else float("nan")
+        backspin = shots["Backspin"].mean() if "Backspin" in shots.columns else float("nan")
+        std_dev = shots[carry_col].std() if carry_col in shots.columns else float("nan")
         shot_count = len(shots)
         section = (
             f"{club}\n"

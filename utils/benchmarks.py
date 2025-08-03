@@ -62,13 +62,23 @@ def check_benchmark(club_name, stats):
 
     for metric, threshold in benchmarks[target_type].items():
         user_val = stats.get(metric)
-        if user_val is None:
+        # ``stats`` may contain strings or other non-numeric values. Attempt to
+        # coerce to ``float`` and skip the metric entirely if that fails so we
+        # don't raise ``TypeError`` when formatting or comparing.
+        try:
+            user_val = float(user_val)
+        except (TypeError, ValueError):
             continue
+
         if isinstance(threshold, tuple):
             low, high = threshold
             symbol = "✅" if low <= user_val <= high else "❌"
-            result_lines.append(f"{metric}: {symbol} (You: {user_val:.1f}, Target: {low}–{high})")
+            result_lines.append(
+                f"{metric}: {symbol} (You: {user_val:.1f}, Target: {low}–{high})"
+            )
         else:
             symbol = "✅" if user_val >= threshold else "❌"
-            result_lines.append(f"{metric}: {symbol} (You: {user_val:.1f}, Target: ≥{threshold})")
+            result_lines.append(
+                f"{metric}: {symbol} (You: {user_val:.1f}, Target: ≥{threshold})"
+            )
     return result_lines
