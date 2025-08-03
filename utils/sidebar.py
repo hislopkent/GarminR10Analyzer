@@ -8,7 +8,7 @@ def render_sidebar() -> None:
     between the main app and its sub-pages.
     """
     st.sidebar.title("Navigation")
-    st.sidebar.page_link("app.py", label="🏠 Home")
+    st.sidebar.page_link("Home.py", label="🏠 Home")
     st.sidebar.page_link("pages/0_Analysis.py", label="📈 Analysis")
     st.sidebar.page_link("pages/1_Sessions.py", label="📋 Sessions")
     st.sidebar.page_link("pages/2_Benchmark_Report.py", label="📌 Benchmark Report")

@@ -36,7 +36,7 @@ A Streamlit-based app for analyzing and improving your golf performance using da
 
 ```
 GarminR10Analyzer-main/
-├── app.py                      # Main entry point (CSV uploads, session state)
+├── Home.py                     # Main entry point (CSV uploads, session state)
 ├── pages/
 │   ├── 0_Analysis.py           # Overview + benchmarking
 │   ├── 1_Sessions.py           # Viewer + practice log
@@ -58,7 +58,7 @@ GarminR10Analyzer-main/
 git clone https://github.com/hislopkent/GarminR10Analyzer.git
 cd GarminR10Analyzer
 pip install -r requirements.txt
-streamlit run app.py
+streamlit run Home.py
 ```
 
 ### 🐳 Docker Build (Optional)
@@ -111,7 +111,7 @@ This is securely accessed via `os.getenv()`.
 The codebase is intentionally lightweight so it is easy to extend with new
 pages or utilities. A few tips for working on the project:
 
-- **Session state** is managed centrally in `app.py`. Uploaded files and the
+- **Session state** is managed centrally in `Home.py`. Uploaded files and the
   combined dataframe are cached to `sample_data/session_cache.pkl` so that the
   app can recover from reloads. Clearing this file will reset the app's state.
 - **Logging** is configured via `utils/logger.py`. Messages are written to
