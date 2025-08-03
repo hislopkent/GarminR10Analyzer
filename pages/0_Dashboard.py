@@ -327,7 +327,14 @@ else:
         try:
             numeric_cols = club_stats.select_dtypes(include='number').columns
             fmt_dict = {col: '{:.1f}' for col in numeric_cols}
-            styled_stats = club_stats.style.format(fmt_dict)
+numeric_cols = club_stats.select_dtypes(include='number').columns
+fmt = {col: '{:.1f}' for col in numeric_cols}
+try:
+    styled_stats = club_stats.style.format(fmt)
+    st.dataframe(styled_stats, use_container_width=True)
+except Exception as e:
+    st.error(f'⚠️ Could not style club stats: {e}')
+    st.dataframe(club_stats, use_container_width=True)
             st.dataframe(styled_stats, use_container_width=True)
         except Exception as e:
             st.error(f'⚠️ Could not style club stats table: {e}')

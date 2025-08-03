@@ -124,4 +124,3 @@ else:
         st.markdown(
             "This report compares your club performance against Jon Sherman–inspired benchmarks for mid-handicap players. Use ✅ and ❌ to focus your practice on key weaknesses."
         )
-

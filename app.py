@@ -74,6 +74,24 @@ if uploaded_files:
             st.error(f"❌ Failed to load {file.name}: {e}")
 
 
+if uploaded_files:
+    all_data = []
+    for file in uploaded_files:
+        try:
+            MAX_SIZE = 10 * 1024 * 1024  # 10MB
+            if file.size > MAX_SIZE:
+                st.warning(f"{file.name} is too large to process. Try splitting the file.")
+                continue
+
+            content = file.read().decode("utf-8", errors="ignore")
+            st.text_area(f"Preview of {file.name}", content[:1000], height=150)
+            file.seek(0)  # reset for actual parsing
+
+            all_data.append(df)
+        except Exception as e:
+            st.error(f"❌ Failed to load {file.name}: {e}")
+
+
                             session_date = valid_dates.iloc[0]
                         else:
                             session_date = datetime.now().date()
