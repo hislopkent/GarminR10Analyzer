@@ -266,7 +266,9 @@ else:
     for club in sorted(filtered["Club"].unique()):
         st.subheader(f"\U0001F50E {club}")
         club_df = filtered[filtered["Club"] == club]
-        st.dataframe(club_df.describe().T.style.format("{:.1f}"))
+        club_stats = club_df.describe(include="all").T
+        numeric_cols = club_stats.select_dtypes(include="number").columns
+        st.dataframe(club_stats.style.format("{:.1f}", subset=numeric_cols))
         if show_ai_feedback:
             with st.spinner(f"Analyzing {club}..."):
                 feedback = generate_ai_summary(club, filtered)
