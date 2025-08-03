@@ -9,4 +9,8 @@ services:
     envVars:
       - key: PORT
         value: 8501
+      - key: OPENAI_API_KEY
+        fromEnv: OPENAI_API_KEY
+      - key: ASSISTANT_ID
+        fromEnv: ASSISTANT_ID
     dockerCommand: streamlit run app.py --server.port $PORT --server.enableCORS false
