@@ -48,7 +48,7 @@ else:
     - `Date`: Timestamp (e.g., "7/20/25 7:17:39 AM")
     - `Club Type`: Club used (e.g., "5 Iron", "Driver")
     - `Carry Distance`: Carry distance in yards
-    - Other columns: `Backspin`, `Sidespin`, `Total Distance`, `Smash Factor`, `Apex Height`
+    - Other columns: `Backspin`, `Sidespin`, `Total Distance`, `Smash Factor`, `Apex Height`, `Attack Angle`
     """)
 
     def create_session_name(date_series):
