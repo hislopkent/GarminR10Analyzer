@@ -33,7 +33,7 @@ A Streamlit-based app for analyzing and improving your golf performance using da
 GarminR10Analyzer-main/
 ├── app.py                      # Main entry point (CSV uploads, session state)
 ├── pages/
-│   ├── 0_dashboard.py          # Club averages + filters
+│   ├── 0_Dashboard.py          # Club averages + filters
 │   ├── 1_Sessions_Viewer.py    # Table viewer for all shots
 │   └── 2_Benchmark_Report.py   # 🔥 Benchmark coaching report
 ├── utils/
