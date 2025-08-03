@@ -2,6 +2,7 @@
 
 import os
 import openai
+from typing import Dict
 
 
 def generate_ai_summary(club_name, df):
@@ -56,3 +57,110 @@ Explain what this means for my consistency and what to do in practice. Be specif
         return f"⚠️ AI summary error: {run.status}"
     except Exception as e:
         return f"⚠️ AI summary error: {str(e)}"
+
+
+def generate_ai_batch_summaries(df) -> Dict[str, str]:
+    """Generate AI feedback for multiple clubs using a single prompt.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing all shot data with a ``Club`` column.
+
+    Returns
+    -------
+    Dict[str, str]
+        Mapping of club name to the AI generated feedback string. If credentials
+        are missing or an error occurs, each club maps to an error message.
+    """
+
+    clubs = df["Club"].unique().tolist()
+    if not clubs:
+        return {}
+
+    summaries = {club: "" for club in clubs}
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    assistant_id = os.getenv("OPENAI_ASSISTANT_ID")
+    client = openai.OpenAI(api_key=api_key) if api_key else None
+
+    if not client or not assistant_id:
+        return {club: "⚠️ AI credentials missing." for club in clubs}
+
+    # Build a combined prompt with statistics for each club
+    sections = []
+    for club in clubs:
+        shots = df[df["Club"] == club]
+        if shots.empty:
+            continue
+        carry = shots["Carry"].mean()
+        smash = shots["Smash Factor"].mean()
+        launch = shots["Launch Angle"].mean()
+        backspin = shots["Backspin"].mean()
+        std_dev = shots["Carry"].std()
+        shot_count = len(shots)
+        section = (
+            f"{club}\n"
+            f"- Carry: {carry:.1f} yds\n"
+            f"- Smash: {smash:.2f}\n"
+            f"- Launch: {launch:.1f}°\n"
+            f"- Backspin: {backspin:.0f} rpm\n"
+            f"- Std Dev (Carry): {std_dev:.1f}\n"
+            f"- Shots: {shot_count}"
+        )
+        sections.append(section)
+
+    if not sections:
+        return {club: "No data for this club." for club in clubs}
+
+    prompt = (
+        "You're a golf performance coach trained in Jon Sherman's Four Foundations. "
+        "I use a Garmin R10. Provide a short, actionable summary for each club "
+        "below. Format your reply as 'Club: summary' for each club.\n\n" + "\n\n".join(sections)
+    )
+
+    try:
+        thread = client.beta.threads.create()
+        client.beta.threads.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content=prompt,
+        )
+        run = client.beta.threads.runs.create(
+            thread_id=thread.id,
+            assistant_id=assistant_id,
+        )
+        import time
+
+        while run.status not in ["completed", "failed", "cancelled", "expired"]:
+            time.sleep(1)
+            run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+
+        if run.status != "completed":
+            return {club: f"⚠️ AI summary error: {run.status}" for club in clubs}
+
+        messages = client.beta.threads.messages.list(thread_id=thread.id)
+        text = messages.data[0].content[0].text.value
+
+        current = None
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.endswith(":") and stripped[:-1] in summaries:
+                current = stripped[:-1]
+                summaries[current] = ""
+                continue
+            if ":" in stripped and stripped.split(":", 1)[0] in summaries and summaries[
+                stripped.split(":", 1)[0]
+            ] == "":
+                current, msg = stripped.split(":", 1)
+                current = current.strip()
+                summaries[current] = msg.strip()
+            elif current:
+                summaries[current] += (" " if summaries[current] else "") + stripped
+
+        return {club: (msg.strip() if msg else "⚠️ AI summary error") for club, msg in summaries.items()}
+
+    except Exception as e:
+        return {club: f"⚠️ AI summary error: {str(e)}" for club in clubs}
