@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import openai
+import altair as alt
 
 st.set_page_config(layout="centered")
 st.header("📊 Dashboard – Club Summary")
@@ -53,42 +54,50 @@ else:
         filtered = filtered.groupby('Club').apply(remove_carry_outliers).reset_index(drop=True)
         st.info("Outliers removed using IQR on Carry distance per club (e.g., excluding poor shots like 100-yard drivers).")
     
-    # Aggregate only after ensuring numeric types
+    # Aggregate
     grouped = filtered.groupby('Club')[numeric_cols].agg(['mean', 'median', 'std']).round(1)
-    st.dataframe(grouped, use_container_width=True)
     
-    # Bar chart for carry distance
-    carry_data = grouped[('Carry', 'mean')].reset_index()
-    if st.checkbox("Show Carry Distance Chart", value=True) and not carry_data.empty:
-        chart_data = {
-            "type": "bar",
-            "data": {
-                "labels": carry_data['Club'].tolist(),
-                "datasets": [{
-                    "label": "Average Carry Distance",
-                    "data": carry_data[('Carry', 'mean')].tolist(),
-                    "backgroundColor": ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"],
-                    "borderColor": ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"],
-                    "borderWidth": 1
-                }]
-            },
-            "options": {
-                "scales": {
-                    "y": {"title": {"display": True, "text": "Yards"}}
-                }
-            }
-        }
-        st.markdown("### Average Carry Distance by Club")
-        st.components.v1.html(f"""
-            <canvas id='carryChart'></canvas>
-            <script src='https://cdn.jsdelivr.net/npm/chart.js'></script>
-            <script>
-                const ctx = document.getElementById('carryChart').getContext('2d');
-                new Chart(ctx, {chart_data});
-            </script>
-        """, height=400)
-    else:
-        st.warning("No data available for chart (e.g., all shots filtered as outliers).")
+    # Flatten the multi-index for better readability
+    grouped_flat = grouped.copy()
+    grouped_flat.columns = [f"{col[0]}_{col[1]}" for col in grouped_flat.columns]
+    grouped_flat = grouped_flat.reset_index()
+    
+    st.dataframe(grouped_flat, use_container_width=True)
+    
+    # Explanations for statistics
+    st.markdown("""
+    ### Statistic Explanations
+    - **Mean**: The average value, representing your overall performance across shots (e.g., mean Carry is your typical distance).
+    - **Median**: The middle value, ignoring extreme outliers (e.g., poor shots); useful for consistent performance assessment.
+    - **Std (Standard Deviation)**: Measures variability; lower values indicate more consistent shots (e.g., low Carry std means reliable distance).
+    """)
+    
+    # Improved chart: Altair grouped bar for mean and median, with error bars for std on mean
+    if not grouped_flat.empty:
+        # Prepare data for chart (focus on Carry for example)
+        chart_data = grouped_flat[['Club', 'Carry_mean', 'Carry_median', 'Carry_std']]
+        chart_data = chart_data.melt(id_vars=['Club'], value_vars=['Carry_mean', 'Carry_median'], var_name='Stat', value_name='Value')
+        chart_data['Std'] = chart_data.apply(lambda row: grouped_flat.loc[grouped_flat['Club'] == row['Club'], 'Carry_std'].values[0] if row['Stat'] == 'Carry_mean' else 0, axis=1)
+        chart_data['Lower'] = chart_data['Value'] - chart_data['Std']
+        chart_data['Upper'] = chart_data['Value'] + chart_data['Std']
+
+        # Bar chart
+        bar = alt.Chart(chart_data).mark_bar().encode(
+            x='Club:O',
+            y='Value:Q',
+            color='Stat:N',
+            tooltip=['Club', 'Stat', 'Value', 'Std']
+        ).properties(title='Carry Distance: Mean and Median with Std Deviation')
+
+        # Error bars for mean
+        error = alt.Chart(chart_data[chart_data['Stat'] == 'Carry_mean']).mark_errorbar(color='black').encode(
+            x='Club:O',
+            y='Lower:Q',
+            y2='Upper:Q'
+        )
+
+        chart = (bar + error).interactive()
+        st.altair_chart(chart, use_container_width=True)
     
     # AI Insights section
     st.subheader("AI Insights")
