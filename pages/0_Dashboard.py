@@ -289,6 +289,41 @@ else:
                 feedback = generate_ai_summary(club, filtered)
                 st.markdown(f"**AI Feedback:**\n\n> {feedback}")
 
+    @st.cache_data
+    def build_club_summary(filtered_df, grouped_df):
+        summary_rows = []
+        for club in grouped_df.index:
+            stats = grouped_df.loc[club]
+            stats_dict = {f"{metric}_{stat}": stats[(metric, stat)] for metric in numeric_cols for stat in ['mean', 'median', 'std']}
+            ai_fb = generate_ai_summary(club, filtered_df)
+            summary_rows.append({"Club": club, **stats_dict, "AI Feedback": ai_fb})
+        summary_df = pd.DataFrame(summary_rows)
+        md_lines = []
+        for _, row in summary_df.iterrows():
+            md_lines.append(f"## {row['Club']}")
+            stats_table = pd.DataFrame({
+                "Metric": numeric_cols,
+                "Mean": [row[f"{m}_mean"] for m in numeric_cols],
+                "Median": [row[f"{m}_median"] for m in numeric_cols],
+                "Std": [row[f"{m}_std"] for m in numeric_cols],
+            })
+            md_lines.append(stats_table.to_markdown(index=False))
+            md_lines.append("")
+            md_lines.append("**AI Feedback:**")
+            md_lines.append(row["AI Feedback"])
+            md_lines.append("")
+        markdown_report = "\n".join(md_lines)
+        return summary_df, markdown_report
+
+    st.markdown("---")
+    st.subheader("📥 Club Summary Report")
+    summary_df, summary_md = build_club_summary(filtered, grouped)
+    report_format = st.radio("Report Format", ["Markdown", "CSV"], horizontal=True)
+    if report_format == "Markdown":
+        st.download_button("Download Club Summary", summary_md, file_name="club_summary.md", mime="text/markdown")
+    else:
+        st.download_button("Download Club Summary", summary_df.to_csv(index=False), file_name="club_summary.csv", mime="text/csv")
+
     with st.expander("💡 Show AI Suggestions", expanded=False):
         st.subheader("AI Insights")
         enable_ai = st.checkbox("Enable AI Insights")
