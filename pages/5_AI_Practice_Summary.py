@@ -8,6 +8,7 @@ if not uploaded_files:
     st.warning("📤 Please upload CSV files on the home page first.")
     st.stop()
 
+import pandas as pd
 from utils.practice_ai import analyze_practice_session
 
 st.title("🧠 AI Practice Summary")

@@ -10,6 +10,7 @@ if not uploaded_files:
 
 logger.info("📄 Page loaded: 4 AI Insights")
 
+import pandas as pd
 from utils.ai_feedback import generate_ai_summary
 
 st.title("🧠 AI Insights")
