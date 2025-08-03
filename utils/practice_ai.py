@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from openai import OpenAI
 import os
+from .data_utils import coerce_numeric
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -20,7 +21,7 @@ def analyze_club_stats(df: pd.DataFrame, club: str) -> dict:
     # Clean and cast existing columns only
     for col in ["Carry Distance", "Launch Angle", "Spin Rate", "Smash Factor", "Offline"]:
         if col in club_df.columns:
-            club_df[col] = pd.to_numeric(club_df[col], errors="coerce")
+            club_df[col] = coerce_numeric(club_df[col])
 
     avg_smash = club_df["Smash Factor"].mean() if "Smash Factor" in club_df else np.nan
     avg_launch = club_df["Launch Angle"].mean() if "Launch Angle" in club_df else np.nan

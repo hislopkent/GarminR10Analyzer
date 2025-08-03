@@ -10,6 +10,7 @@ import pandas as pd
 import plotly.express as px
 
 from utils.logger import logger
+from utils.data_utils import coerce_numeric
 
 # Ensure data is loaded -----------------------------------------------------
 if "session_df" not in st.session_state or st.session_state["session_df"].empty:
@@ -41,6 +42,10 @@ col_map = {
 _df = st.session_state["session_df"].rename(
     columns={k: v for k, v in col_map.items() if k in st.session_state["session_df"].columns}
 )
+# ``rename`` can create duplicate columns when multiple source columns map to
+# the same standardised name (e.g., "Carry" and "Carry Distance").  Remove
+# duplicates so that subsequent ``df[col]`` lookups yield a Series.
+_df = _df.loc[:, ~_df.columns.duplicated()]
 
 required = [
     "club",
@@ -68,7 +73,7 @@ for col in [
     "offline_distance",
 ]:
     if col in _df.columns:
-        _df[col] = pd.to_numeric(_df[col], errors="coerce")
+        _df[col] = coerce_numeric(_df[col])
 
 df = _df.dropna(subset=["club", "session_name"])
 

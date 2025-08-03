@@ -18,6 +18,7 @@ logger.info("📄 Page loaded: 2 Benchmark Report")
 
 import pandas as pd
 from utils.benchmarks import get_benchmarks
+from utils.data_utils import coerce_numeric
 
 st.title("✅ Benchmark Comparison Report")
 
@@ -39,7 +40,7 @@ def compare_to_benchmark(club, club_df):
     club_df = club_df.copy()
     for col in ["Carry Distance", "Carry", "Smash Factor", "Launch Angle", "Backspin"]:
         if col in club_df.columns:
-            club_df[col] = pd.to_numeric(club_df[col], errors="coerce")
+            club_df[col] = coerce_numeric(club_df[col])
 
     for metric, target in bmark.items():
         col = metric
