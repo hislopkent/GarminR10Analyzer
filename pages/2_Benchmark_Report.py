@@ -3,7 +3,7 @@ import pandas as pd
 
 from utils.benchmarks import check_benchmark
 from utils.sidebar import render_sidebar
-from utils.ai_feedback import generate_ai_summary
+from utils.ai_feedback import generate_ai_batch_summaries
 
 
 st.set_page_config(layout="centered")
@@ -83,11 +83,20 @@ else:
         )
 
         if generate_clicked:
-            for club in grouped["Club"]:
-                if club not in st.session_state["club_summaries"]:
+            missing = [
+                club
+                for club in grouped["Club"]
+                if club not in st.session_state["club_summaries"]
+            ]
+            if missing:
+                with st.spinner("Analyzing clubs..."):
+                    feedback_map = generate_ai_batch_summaries(
+                        filtered[filtered["Club"].isin(missing)]
+                    )
+                for club in missing:
                     with st.spinner(f"Analyzing {club}..."):
-                        st.session_state["club_summaries"][club] = generate_ai_summary(
-                            club, filtered
+                        st.session_state["club_summaries"][club] = feedback_map.get(
+                            club, "⚠️ No feedback available."
                         )
 
         for club in grouped["Club"]:
