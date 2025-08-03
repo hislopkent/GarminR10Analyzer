@@ -180,6 +180,58 @@ else:
         fig.update_layout(yaxis_title=metric, hovermode="x", yaxis_tickformat=".1f", legend_title_text='Statistic')
         st.plotly_chart(fig, use_container_width=True)
 
+    st.markdown("---")
+    show_ai_feedback = st.checkbox("\U0001F4A1 Show AI Summary Under Each Club", value=False)
+    if show_ai_feedback:
+        st.info("Generating personalized feedback per club based on your session data...")
+
+    openai.api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("openai_key")
+
+    def generate_ai_summary(club_name, df):
+        shots = df[df["Club"] == club_name]
+        if shots.empty:
+            return "No data for this club."
+
+        carry = shots["Carry"].mean()
+        smash = shots["Smash Factor"].mean()
+        launch = shots["Launch Angle"].mean()
+        backspin = shots["Backspin"].mean()
+        std_dev = shots["Carry"].std()
+        shot_count = len(shots)
+
+        prompt = f"""
+You're a golf performance coach trained in Jon Sherman's Four Foundations. I use a Garmin R10. Give me a short, actionable summary for my {club_name} based on these stats:
+
+- Carry: {carry:.1f} yds
+- Smash: {smash:.2f}
+- Launch: {launch:.1f}°
+- Backspin: {backspin:.0f} rpm
+- Std Dev (Carry): {std_dev:.1f}
+- Shots: {shot_count}
+
+Explain what this means for my consistency and what to do in practice. Be specific and encouraging. Mention if anything is a standout or weak point.
+"""
+
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.6,
+                max_tokens=300,
+            )
+            return response.choices[0].message["content"]
+        except Exception as e:
+            return f"\u26a0\ufe0f AI summary error: {str(e)}"
+
+    for club in sorted(filtered["Club"].unique()):
+        st.subheader(f"\U0001F50E {club}")
+        club_df = filtered[filtered["Club"] == club]
+        st.dataframe(club_df.describe().T.style.format("{:.1f}"))
+        if show_ai_feedback:
+            with st.spinner(f"Analyzing {club}..."):
+                feedback = generate_ai_summary(club, filtered)
+                st.markdown(f"**AI Feedback:**\n\n> {feedback}")
+
     with st.expander("💡 Show AI Suggestions", expanded=False):
         st.subheader("AI Insights")
         enable_ai = st.checkbox("Enable AI Insights")
