@@ -159,7 +159,7 @@ else:
                      delta_color="inverse")
 
     st.markdown("""
-    ### Statistic Explanations
+    ### Statistics Explanations
     - **Mean**: Average performance; e.g., mean Carry is your typical distance (aim >220 yds for Driver).
     - **Median**: Middle value, less affected by outliers; compare to mean for consistency.
     - **Std**: Variability; lower values (e.g., <10% of mean) indicate consistent shots.
