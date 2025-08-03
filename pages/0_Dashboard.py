@@ -118,7 +118,9 @@ else:
             return ['background-color: red' if v < 1.3 else 'background-color: green' for v in s]
         elif s.name == 'Launch Angle_mean':
             tooltip = "Target: 10-16° (Driver), 15-20° (7 Iron)"
-            return ['background-color: red' if (v < 10 or v > 16) if 'Driver' in s.index else (v < 15 or v > 20) else 'background-color: green' for v in s]
+            return ['background-color: ' + ('red' if any(c in club for club in s.index for c in ['Driver']) and (v < 10 or v > 16) else 
+                                          'red' if any(c in club for club in s.index for c in ['7 Iron', 'Iron']) and (v < 15 or v > 20) else 
+                                          'green') for v, club in zip(s, s.index)]
         elif s.name == 'Apex Height_mean':
             tooltip = "Target: 30-40 ft (Driver), 60-90 ft (Irons)"
             return ['background-color: red' if v < 30 or v > 40 else 'background-color: green' for v in s]
