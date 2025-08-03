@@ -11,25 +11,6 @@ from utils.sidebar import render_sidebar
 from utils.ai_feedback import generate_ai_summary
 
 # Password protection
-PASSWORD = os.environ.get("PASSWORD") or "demo123"
-if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
-
-if not st.session_state["authenticated"]:
-    st.title("🔒 Protected App")
-    password = st.text_input("Enter password:", type="password")
-    if password == PASSWORD:
-        st.session_state["authenticated"] = True
-        st.experimental_rerun()
-    elif password:
-        st.error("❌ Incorrect password")
-    st.stop()
-
-# Logout button
-if st.button("🔓 Logout"):
-    st.session_state["authenticated"] = False
-    st.experimental_rerun()
-
 
 from utils.sidebar import render_sidebar
 
