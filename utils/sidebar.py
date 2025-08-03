@@ -9,7 +9,7 @@ def render_sidebar() -> None:
     """
     st.sidebar.title("Navigation")
     st.sidebar.page_link("app.py", label="🏠 Home")
-    st.sidebar.page_link("pages/0_Dashboard.py", label="📊 Club Dashboard")
-    st.sidebar.page_link("pages/1_Sessions_Viewer.py", label="📋 Sessions Viewer")
+    st.sidebar.page_link("pages/0_Analysis.py", label="📈 Analysis")
+    st.sidebar.page_link("pages/1_Sessions.py", label="📋 Sessions")
     st.sidebar.page_link("pages/2_Benchmark_Report.py", label="📌 Benchmark Report")
-    st.sidebar.page_link("pages/3_Practice_Log.py", label="📝 Practice Log")
+    st.sidebar.page_link("pages/3_AI_Feedback.py", label="🧠 AI Feedback")
