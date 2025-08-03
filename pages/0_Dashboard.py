@@ -200,6 +200,47 @@ else:
         fig.update_layout(yaxis_title=metric, hovermode="x", yaxis_tickformat=".1f", legend_title_text='Statistic')
         st.plotly_chart(fig, use_container_width=True)
 
+        st.subheader("Carry Consistency Across Sessions")
+        trend_club = st.selectbox("Club for session trend", sorted(df_all['Club'].unique()))
+        club_sessions = df_all[df_all['Club'] == trend_club].dropna(subset=['Carry', 'Date'])
+        if club_sessions.empty:
+            st.info("No data for the selected club across sessions.")
+        else:
+            session_summary = (
+                club_sessions.groupby('Session').agg(
+                    avg_carry=('Carry', 'mean'),
+                    std_carry=('Carry', 'std'),
+                    session_date=('Date', lambda x: x.iloc[0].date()),
+                )
+                .sort_values('session_date')
+                .reset_index()
+            )
+            session_summary['std_carry'] = session_summary['std_carry'].fillna(0)
+
+            fig_trend = go.Figure()
+            fig_trend.add_trace(
+                go.Scatter(
+                    x=session_summary['session_date'],
+                    y=session_summary['avg_carry'],
+                    mode='lines+markers',
+                    name='Average Carry'
+                )
+            )
+            fig_trend.add_trace(
+                go.Scatter(
+                    x=session_summary['session_date'],
+                    y=session_summary['std_carry'],
+                    mode='lines+markers',
+                    name='Carry Std Dev'
+                )
+            )
+            fig_trend.update_layout(
+                title=f"{trend_club} Carry Over Sessions",
+                xaxis_title="Session Date",
+                yaxis_title="Yards",
+            )
+            st.plotly_chart(fig_trend, use_container_width=True)
+
         lateral_col = next((col for col in ['Offline', 'Side', 'Deviation', 'Lateral', 'Sidespin'] if col in filtered.columns), None)
         if lateral_col:
             st.subheader("Carry Dispersion")
