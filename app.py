@@ -15,14 +15,21 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Consistent sidebar navigation across all pages
+# Initialize session state for current page if not present
+if "current_page" not in st.session_state:
+    st.session_state["current_page"] = "app.py"
+
+# Consistent sidebar navigation
 st.sidebar.title("Navigation")
 page = st.sidebar.selectbox("Select Page", ["🏠 Home (Upload CSVs)", "📋 Sessions Viewer", "📊 Dashboard"])
 
-if page == "📋 Sessions Viewer":
-    st.switch_page("pages/1_Sessions_Viewer.py")
-elif page == "📊 Dashboard":
-    st.switch_page("pages/0_dashboard.py")
+# Navigate based on selection, preserving state
+if page != st.session_state["current_page"]:
+    st.session_state["current_page"] = page
+    if page == "📋 Sessions Viewer":
+        st.switch_page("pages/1_Sessions_Viewer.py")
+    elif page == "📊 Dashboard":
+        st.switch_page("pages/0_dashboard.py")
 
 # Conditional guidance based on data
 if 'df_all' not in st.session_state or st.session_state['df_all'].empty:
@@ -50,7 +57,7 @@ def create_session_name(date_series):
 
 uploaded_files = st.file_uploader("Upload Garmin R10 CSV files", type="csv", accept_multiple_files=True)
 
-if uploaded_files:
+if uploaded_files and st.session_state.get("current_page") == "app.py":
     with st.spinner("Processing CSVs..."):
         dfs = []
         total_rows = 0
