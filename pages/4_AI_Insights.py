@@ -11,7 +11,14 @@ df = st.session_state["session_df"]
 club_list = sorted(df["Club"].dropna().unique())
 selected_club = st.selectbox("Select a club for feedback", club_list)
 
-with st.spinner("Generating AI summary..."):
-    feedback = generate_ai_summary(selected_club, df)
+if st.button("🧠 Generate AI Summary"):
+    with st.spinner("Generating AI summary..."):
+        feedback = generate_ai_summary(selected_club, df)
+        st.session_state[f"ai_{selected_club}"] = feedback
+        st.success("✅ Summary generated!")
+
+# Show cached summary if it exists
+cached = st.session_state.get(f"ai_{selected_club}")
+if cached:
     st.markdown("### 💬 Summary")
-    st.write(feedback)
+    st.write(cached)

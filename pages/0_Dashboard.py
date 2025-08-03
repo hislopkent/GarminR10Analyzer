@@ -11,6 +11,9 @@ if "session_df" not in st.session_state or st.session_state["session_df"].empty:
     st.stop()
 
 df = st.session_state["session_df"]
+if "Club" not in df.columns:
+    st.error("❌ The uploaded data does not contain a 'Club' column. Please check your CSV files.")
+    st.stop()
 
 # Sidebar club selection
 club_list = sorted(df["Club"].dropna().unique())
