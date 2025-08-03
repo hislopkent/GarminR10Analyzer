@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import openai
-import altair as alt
+import plotly.express as px  # Assuming Plotly from previous suggestions
 
 st.set_page_config(layout="centered")
 st.header("📊 Dashboard – Club Summary")
@@ -14,37 +14,44 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Consistent sidebar navigation
+st.sidebar.title("Navigation")
+page = st.sidebar.selectbox("Select Page", ["🏠 Home (Upload CSVs)", "📋 Sessions Viewer", "📊 Dashboard"])
+
+if page == "🏠 Home (Upload CSVs)":
+    st.switch_page("app.py")
+elif page == "📋 Sessions Viewer":
+    st.switch_page("pages/1_Sessions_Viewer.py")
+
+# Conditional guidance
+if 'df_all' not in st.session_state or st.session_state['df_all'].empty:
+    st.sidebar.warning("Upload data to enable all features.")
+else:
+    st.sidebar.success("Data loaded. Explore sessions or dashboard!")
+
 df_all = st.session_state.get('df_all')
 
 if df_all is None or df_all.empty:
     st.warning("No session data uploaded yet. Go to the Home page to upload.")
-    if st.button("Go to Home (Upload)"):
-        st.session_state["current_page"] = "app.py"
-        st.switch_page("app.py")
 else:
     st.subheader("Averages per Club")
     numeric_cols = ['Carry', 'Backspin', 'Sidespin', 'Total', 'Smash Factor', 'Apex Height', 'Launch Angle', 'Attack Angle']
     df_all = df_all.copy()
     
-    # Convert all numeric columns to numeric, coercing errors to NaN
     for col in numeric_cols:
         if col in df_all.columns:
             df_all[col] = pd.to_numeric(df_all[col], errors='coerce')
     
-    # Drop rows with NaN in numeric columns
     df_all = df_all.dropna(subset=numeric_cols, how='any')
     
-    # Session and club filters
     sessions = st.multiselect("Select Sessions", df_all['Session'].unique(), default=df_all['Session'].unique(), help="Sessions are created per day from uploaded CSVs.")
     clubs = st.multiselect("Select Clubs", df_all['Club'].unique(), default=df_all['Club'].unique())
     filtered = df_all[df_all['Session'].isin(sessions) & df_all['Club'].isin(clubs)] if sessions and clubs else df_all
     
-    # Debug: Check dtypes
     if filtered[numeric_cols].dtypes.any() == 'object':
         st.warning("One or more numeric columns contain non-numeric data. Aggregates may be incomplete.")
         st.write("Column dtypes:", filtered[numeric_cols].dtypes)
     
-    # Outlier removal options
     remove_outliers_iqr = st.checkbox("Remove Outliers (based on Carry IQR per club)", value=False)
     remove_contact_outliers = st.checkbox("Remove Fat/Thin Shots (based on Smash Factor, Launch Angle, Backspin, Attack Angle)", value=False)
     
@@ -81,17 +88,14 @@ else:
         filtered = filtered[~filtered.apply(is_poor_contact, axis=1)]
         st.info("Fat/thin shots removed using thresholds on Smash Factor (poor contact), Launch Angle (high/low), Backspin (extreme), and Attack Angle (too negative for fat). Thresholds are club-specific.")
 
-    # Aggregate
     grouped = filtered.groupby('Club')[numeric_cols].agg(['mean', 'median', 'std']).round(1)
     
-    # Flatten the multi-index for better readability
     grouped_flat = grouped.copy()
     grouped_flat.columns = [f"{col[0]}_{col[1]}" for col in grouped_flat.columns]
     grouped_flat = grouped_flat.reset_index()
     
     st.dataframe(grouped_flat, use_container_width=True)
     
-    # Explanations for statistics
     st.markdown("""
     ### Statistic Explanations
     - **Mean**: The average value, representing your typical performance across shots (e.g., mean Carry is your average distance).
@@ -99,7 +103,6 @@ else:
     - **Std (Standard Deviation)**: Measures variability; lower values indicate more consistent shots (e.g., low Carry std means reliable distance).
     """)
     
-    # Improved chart: Altair grouped bar for mean and median, with error bars for std on mean
     if not grouped_flat.empty:
         chart_data = grouped_flat[['Club', 'Carry_mean', 'Carry_median', 'Carry_std']]
         chart_data = chart_data.melt(id_vars=['Club'], value_vars=['Carry_mean', 'Carry_median'], var_name='Stat', value_name='Value')
@@ -110,7 +113,7 @@ else:
         bar = alt.Chart(chart_data).mark_bar().encode(
             x='Club:O',
             y='Value:Q',
-            color=alt.Color('Stat:N', scale=alt.Scale(range=['#1f77b4', '#2ca02c'])),
+            color='Stat:N',
             tooltip=['Club', 'Stat', 'Value', 'Std']
         ).properties(title='Carry Distance: Mean and Median with Std Deviation')
 
@@ -123,7 +126,6 @@ else:
         chart = (bar + error).interactive()
         st.altair_chart(chart, use_container_width=True)
     
-    # AI Insights section
     st.subheader("AI Insights")
     api_key = st.text_input("Enter OpenAI API Key", type="password")
     if api_key and st.button("Generate AI Insights"):
@@ -140,8 +142,3 @@ else:
             st.error(f"Error generating insights: {str(e)}. Check your API key or try again. If quota exceeded, upgrade your OpenAI plan at https://platform.openai.com/account/billing or wait for reset.")
     elif not api_key:
         st.info("Enter your OpenAI API key above to generate AI-powered suggestions on your data (e.g., 'Improve driver smash factor for better distance'). Get a key at openai.com.")
-    
-    # Back navigation
-    if st.button("Back to Home"):
-        st.session_state["current_page"] = "app.py"
-        st.switch_page("app.py")
