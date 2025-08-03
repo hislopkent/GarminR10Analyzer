@@ -97,14 +97,15 @@ else:
                     dfs.append(df)
                     total_rows += len(df)
                     st.progress((idx + 1) / len(uploaded_files))
-                except pd.errors.ParserError:
-                    st.error(
-                        f"Error processing {file.name}: Malformed CSV. File skipped."
-                    )
                 except Exception as e:
-                    st.error(
-                        f"Error processing {file.name}: {str(e)}. File skipped. Check if it's a valid CSV."
+                    file.seek(0)
+                    preview_lines = (
+                        file.getvalue().decode('utf-8', errors='replace').splitlines()[:10]
                     )
+                    preview_text = '\n'.join(preview_lines)
+                    st.error(f"Failed to process {file.name}: {e}")
+                    st.text("First 10 lines of the file for debugging:")
+                    st.code(preview_text)
             
             if not dfs:
                 st.error("No valid CSVs loaded. Please check your files and try again.")
