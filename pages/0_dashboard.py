@@ -11,17 +11,19 @@ st.header("📊 Dashboard – Club Summary")
 st.markdown("""
     <style>
         .dataframe {font-size: small; overflow-x: auto;}
+        .sidebar .sidebar-content {background-color: #f0f2f6; padding: 10px;}
+        .sidebar a {color: #2ca02c; text-decoration: none;}
+        .sidebar a:hover {background-color: #228B22; text-decoration: underline;}
     </style>
 """, unsafe_allow_html=True)
 
-# Consistent sidebar navigation
+# Consistent sidebar navigation with links
 st.sidebar.title("Navigation")
-page = st.sidebar.selectbox("Select Page", ["🏠 Home (Upload CSVs)", "📋 Sessions Viewer", "📊 Dashboard"])
-
-if page == "🏠 Home (Upload CSVs)":
-    st.switch_page("app.py")
-elif page == "📋 Sessions Viewer":
-    st.switch_page("pages/1_Sessions_Viewer.py")
+st.sidebar.markdown("""
+- [🏠 Home (Upload CSVs)](/)
+- [📋 Sessions Viewer](/1_Sessions_Viewer)
+- [📊 Dashboard](/0_dashboard)
+""", unsafe_allow_html=True)
 
 # Conditional guidance
 if 'df_all' not in st.session_state or st.session_state['df_all'].empty:
@@ -96,14 +98,6 @@ else:
     
     st.dataframe(grouped_flat, use_container_width=True)
     
-    # Download dashboard data
-    st.download_button(
-        label="Download Dashboard Stats",
-        data=grouped_flat.to_csv(index=False),
-        file_name="dashboard_stats.csv",
-        mime="text/csv"
-    )
-    
     st.markdown("""
     ### Statistic Explanations
     - **Mean**: <span title="Average performance; e.g., mean Carry shows typical distance—aim to increase for better range.">The average value</span>.
@@ -124,12 +118,11 @@ else:
         st.plotly_chart(fig, use_container_width=True)
     
     st.subheader("AI Insights")
-    focus = st.text_input("AI Focus (e.g., 'irons only' or 'distance improvement')", "")
     api_key = st.text_input("Enter OpenAI API Key", type="password")
     if api_key and st.button("Generate AI Insights"):
         try:
             client = openai.OpenAI(api_key=api_key)
-            prompt = f"Based on these golf shot averages per club (mean, median, std for Carry, Backspin, Sidespin, Total, Smash Factor, Apex Height, Launch Angle, Attack Angle):\n{grouped.to_string()}\nProvide suggestions, comments, and recommendations for improving performance. Focus on {focus if focus else 'general'} aspects like fat/thin shots (low Smash Factor, extreme Launch Angle/Backspin), outliers, consistency, and typical golf benchmarks (e.g., driver carry >200 yards, irons Smash Factor >1.3)."
+            prompt = f"Based on these golf shot averages per club (mean, median, std for Carry, Backspin, Sidespin, Total, Smash Factor, Apex Height, Launch Angle, Attack Angle):\n{grouped.to_string()}\nProvide suggestions, comments, and recommendations for improving performance. Focus on fat/thin shots (low Smash Factor, extreme Launch Angle/Backspin), outliers, consistency, and typical golf benchmarks (e.g., driver carry >200 yards, irons Smash Factor >1.3)."
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "system", "content": "You are a golf performance analyst."}, {"role": "user", "content": prompt}]
