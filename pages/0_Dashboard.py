@@ -128,6 +128,38 @@ col4.metric(
     f"{center_strike_pct:.1f}%" if not np.isnan(center_strike_pct) else "N/A",
 )
 
+# Strike location distribution chart
+if "strike_location" in df_filtered.columns:
+    st.subheader("Strike Location Distribution")
+    strike_counts = (
+        df_filtered["strike_location"].astype(str).str.title().value_counts()
+    )
+    strike_counts = strike_counts.reindex(["Center", "Heel", "Toe"], fill_value=0)
+    strike_df = strike_counts.reset_index()
+    strike_df.columns = ["strike_location", "count"]
+    strike_df["percentage"] = (
+        strike_df["count"] / strike_df["count"].sum() * 100
+        if strike_df["count"].sum() > 0
+        else 0
+    )
+    fig_strike = px.bar(
+        strike_df,
+        x="percentage",
+        y="strike_location",
+        orientation="h",
+        text="percentage",
+        custom_data=["count"],
+        labels={"percentage": "Percentage", "strike_location": "Strike Location"},
+    )
+    fig_strike.update_traces(
+        texttemplate="%{x:.1f}%",
+        hovertemplate="%{y}: %{x:.1f}% (%{customdata[0]} shots)<extra></extra>",
+    )
+    fig_strike.update_layout(xaxis=dict(ticksuffix="%"))
+    st.plotly_chart(fig_strike, use_container_width=True)
+else:
+    st.info("No strike location data available.")
+
 df = df_filtered.copy()
 st.subheader("Shot Dispersion")
 if "Offline" in df.columns:
