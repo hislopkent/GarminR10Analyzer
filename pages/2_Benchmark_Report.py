@@ -29,9 +29,13 @@ def compare_to_benchmark(club, club_df):
         return result
 
     for metric, target in bmark.items():
-        if metric not in club_df.columns:
-            continue
-        value = pd.to_numeric(club_df[metric], errors="coerce").mean()
+        col = metric
+        if col not in club_df.columns:
+            if metric == "Carry" and "Carry Distance" in club_df.columns:
+                col = "Carry Distance"
+            else:
+                continue
+        value = pd.to_numeric(club_df[col], errors="coerce").mean()
         if isinstance(target, tuple):
             result[metric] = "✅" if target[0] <= value <= target[1] else "❌"
         else:
