@@ -29,7 +29,7 @@ else:
     df_all = df_all.dropna(subset=numeric_cols, how='any')
     
     # Session and club filters
-    sessions = st.multiselect("Select Sessions", df_all['Session'].unique(), default=df_all['Session'].unique())
+    sessions = st.multiselect("Select Sessions", df_all['Session'].unique(), default=df_all['Session'].unique(), help="Sessions are created per day from uploaded CSVs.")
     clubs = st.multiselect("Select Clubs", df_all['Club'].unique(), default=df_all['Club'].unique())
     filtered = df_all[df_all['Session'].isin(sessions) & df_all['Club'].isin(clubs)] if sessions and clubs else df_all
     
