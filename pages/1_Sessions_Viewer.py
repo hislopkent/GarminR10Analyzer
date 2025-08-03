@@ -1,4 +1,6 @@
 import streamlit as st
+from utils.logger import logger
+logger.info("📄 Page loaded: 1 Sessions Viewer")
 import streamlit as st
 import os
 import pandas as pd

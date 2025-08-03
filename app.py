@@ -1,4 +1,6 @@
 import streamlit as st
+from utils.logger import logger
+logger.info("🚀 App started")
 import pandas as pd
 import numpy as np
 import os
@@ -11,7 +13,6 @@ st.title("Garmin R10 Multi-Session Analyzer")
 from utils.session_loader import load_sessions
 
 # --- File Upload ---
-uploaded_files = st.file_uploader('Upload Garmin R10 CSV files', type='csv', accept_multiple_files=True)
 keep_all = st.checkbox('Keep all columns in uploaded data (advanced users)', value=False)
 st.warning('⚠️ Uploads over 100MB may fail on free hosting tiers like Render Starter Plan.')
 

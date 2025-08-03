@@ -1,4 +1,6 @@
 import streamlit as st
+from utils.logger import logger
+logger.info("📄 Page loaded: 2 Benchmark Report")
 import pandas as pd
 from utils.benchmarks import get_benchmarks
 

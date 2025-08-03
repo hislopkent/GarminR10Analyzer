@@ -1,4 +1,6 @@
 import streamlit as st
+from utils.logger import logger
+logger.info("📄 Page loaded: 3 Practice Log")
 import pandas as pd
 from datetime import datetime
 

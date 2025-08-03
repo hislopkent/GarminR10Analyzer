@@ -1,4 +1,6 @@
 import streamlit as st
+from utils.logger import logger
+logger.info("📄 Page loaded: 4 AI Insights")
 from utils.ai_feedback import generate_ai_summary
 
 st.title("🧠 AI Insights")
