@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import openai
 import plotly.express as px
-import os  # Added import for os
 
 st.set_page_config(layout="centered")
 st.header("📊 Dashboard – Club Summary")
@@ -93,7 +92,7 @@ else:
 
     @st.cache_data
     def compute_grouped(filtered):
-        return filtered.groupby('Club')[numeric_cols].agg(['mean', 'median', 'std']).round(1)
+        return filtered.groupby('Club')[numeric_cols].agg(['mean', 'median', 'std', 'min', 'max']).round(1)
 
     grouped = compute_grouped(filtered)
     
@@ -101,8 +100,6 @@ else:
     grouped_flat.columns = [f"{col[0]}_{col[1]}" for col in grouped_flat.columns]
     grouped_flat = grouped_flat.reset_index()
     
-    # Improved table with reduced decimals
-    grouped_flat = grouped_flat.round(1)
     st.dataframe(grouped_flat, use_container_width=True)
     
     st.markdown("""
