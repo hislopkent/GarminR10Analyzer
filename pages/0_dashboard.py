@@ -19,34 +19,47 @@ else:
     st.subheader("Averages per Club")
     numeric_cols = ['Carry', 'Backspin', 'Sidespin', 'Total', 'Smash Factor', 'Apex Height']
     df_all = df_all.copy()
-    df_all = df_all.replace([np.inf, -np.inf], np.nan).dropna(subset=numeric_cols, how='any')
+    
+    # Convert all numeric columns to numeric, coercing errors to NaN
+    for col in numeric_cols:
+        if col in df_all.columns:
+            df_all[col] = pd.to_numeric(df_all[col], errors='coerce')
+    
+    # Drop rows with NaN in numeric columns
+    df_all = df_all.dropna(subset=numeric_cols, how='any')
     
     # Session and club filters
     sessions = st.multiselect("Select Sessions", df_all['Session'].unique(), default=df_all['Session'].unique())
     clubs = st.multiselect("Select Clubs", df_all['Club'].unique(), default=df_all['Club'].unique())
     filtered = df_all[df_all['Session'].isin(sessions) & df_all['Club'].isin(clubs)] if sessions and clubs else df_all
     
+    # Debug: Check dtypes
+    if filtered[numeric_cols].dtypes.any() == 'object':
+        st.warning("One or more numeric columns contain non-numeric data. Aggregates may be incomplete.")
+        st.write("Column dtypes:", filtered[numeric_cols].dtypes)
+    
     # Outlier removal option
     remove_outliers = st.checkbox("Remove Outliers (based on Carry IQR per club)", value=False)
     if remove_outliers:
         def remove_carry_outliers(group):
-            if len(group) < 3:  # Need at least 3 shots for IQR
+            if len(group) < 3:  # Need at least 3 shots
                 return group
             Q1 = group['Carry'].quantile(0.25)
             Q3 = group['Carry'].quantile(0.75)
             IQR = Q3 - Q1
-            return group[(group['Carry'] >= Q1 - 1.5 * IQR) & (group['Carry'] <= Q3 + 1.5 * IQR)]
+            filtered_group = group[(group['Carry'] >= Q1 - 1.5 * IQR) & (group['Carry'] <= Q3 + 1.5 * IQR)]
+            return filtered_group if not filtered_group.empty else group  # Return original if all filtered
         
         filtered = filtered.groupby('Club').apply(remove_carry_outliers).reset_index(drop=True)
         st.info("Outliers removed using IQR on Carry distance per club (e.g., excluding poor shots like 100-yard drivers).")
     
+    # Aggregate only after ensuring numeric types
     grouped = filtered.groupby('Club')[numeric_cols].agg(['mean', 'median', 'std']).round(1)
-    grouped = grouped.sort_index()
     st.dataframe(grouped, use_container_width=True)
     
     # Bar chart for carry distance
-    if st.checkbox("Show Carry Distance Chart", value=True):
-        carry_data = grouped[('Carry', 'mean')].reset_index()
+    carry_data = grouped[('Carry', 'mean')].reset_index()
+    if st.checkbox("Show Carry Distance Chart", value=True) and not carry_data.empty:
         chart_data = {
             "type": "bar",
             "data": {
@@ -74,6 +87,8 @@ else:
                 new Chart(ctx, {chart_data});
             </script>
         """, height=400)
+    else:
+        st.warning("No data available for chart (e.g., all shots filtered as outliers).")
     
     # AI Insights section
     st.subheader("AI Insights")
