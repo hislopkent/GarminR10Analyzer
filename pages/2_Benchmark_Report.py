@@ -3,6 +3,7 @@ import pandas as pd
 from utils.benchmarks import check_benchmark
 
 from utils.sidebar import render_sidebar
+from utils.ai_feedback import generate_ai_summary
 
 st.set_page_config(layout="centered")
 st.header("📌 Benchmark Report – Club Performance vs. Goals")
@@ -37,6 +38,10 @@ else:
         st.info("No data found with the current filters.")
     else:
         st.subheader("✅ Benchmark Comparison Results")
+        show_ai_feedback = st.checkbox("\U0001F4A1 Show AI Summary Under Each Club", value=False)
+        if show_ai_feedback:
+            st.info("Generating personalized feedback per club based on your session data...")
+
         grouped = filtered.groupby("Club")[numeric_cols].mean().round(1).reset_index()
 
         cols = st.columns(3)
@@ -47,6 +52,10 @@ else:
                 result_lines = check_benchmark(club_name, row)
                 for line in result_lines:
                     st.write(f"- {line}")
+                if show_ai_feedback:
+                    with st.spinner(f"Analyzing {club_name}..."):
+                        feedback = generate_ai_summary(club_name, filtered)
+                        st.markdown(f"**AI Feedback:**\n\n> {feedback}")
 
         st.markdown("---")
         st.markdown(
