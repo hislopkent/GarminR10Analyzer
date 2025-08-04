@@ -7,8 +7,10 @@ from datetime import datetime
 
 from utils.logger import logger
 from utils.page_utils import require_data
+from utils.responsive import configure_page
 
 logger.info("📄 Page loaded: Sessions")
+configure_page()
 st.title("📋 Sessions")
 
 df_all = require_data().copy()

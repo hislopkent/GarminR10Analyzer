@@ -7,8 +7,10 @@ import streamlit as st
 from utils.logger import logger
 from utils.data_utils import coerce_numeric
 from utils.page_utils import require_data
+from utils.responsive import configure_page
 
 logger.info("📄 Page loaded: Analysis")
+configure_page()
 st.title("📈 Analysis")
 
 # Load and standardise data -------------------------------------------------

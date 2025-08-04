@@ -13,8 +13,9 @@ import streamlit as st
 
 from utils.logger import logger
 from utils.session_loader import load_sessions
+from utils.responsive import configure_page
 
-st.set_page_config(page_title="Garmin R10 Analyzer", layout="wide")
+configure_page()
 st.title("📊 Garmin R10 Analyzer")
 
 CACHE_PATH = os.path.join("sample_data", "session_cache.pkl")
