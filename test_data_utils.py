@@ -15,8 +15,22 @@ def test_remove_outliers_handles_missing_values():
     assert filtered['Metric'].isna().sum() == 1
 
 
+def test_remove_outliers_multiple_columns():
+    df = pd.DataFrame({'A': [1, 1, 1, 1, 100], 'B': [1, 1, 1, 1, 1]})
+    filtered = remove_outliers(df, ['A', 'B'])
+    assert 100 not in filtered['A'].values
+    assert len(filtered) == 4
+
+
 def test_derive_offline_distance_from_side():
     df = pd.DataFrame({"Side Distance": [5, -3]})
     result = derive_offline_distance(df)
     assert "Offline" in result.columns
     assert result["Offline"].tolist() == [5, -3]
+
+
+def test_derive_offline_distance_from_side_column():
+    df = pd.DataFrame({"Side": [4, -2]})
+    result = derive_offline_distance(df)
+    assert "Offline" in result.columns
+    assert result["Offline"].tolist() == [4, -2]
