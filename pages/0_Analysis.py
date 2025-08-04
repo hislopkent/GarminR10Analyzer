@@ -87,7 +87,7 @@ else:  # Select Sessions
         df[df["session_name"].isin(chosen)] if chosen else df.iloc[0:0]
     )
 
-filter_outliers = st.checkbox("Filter outliers", value=False)
+filter_outliers = st.checkbox("Filter outliers", value=True)
 if filter_outliers:
     numeric_cols = [
         "carry_distance",
