@@ -16,11 +16,6 @@ A Streamlit-based app for analyzing and improving your golf performance using da
 - Interactive Plotly charts for carry distance and dispersion
 - Smart session and club filtering
 
-### ✅ Benchmark Report (NEW)
-- Compares your stats to Jon Sherman–style benchmarks
-- Per-club report cards with ✅ / ❌ ratings
-- Built-in feedback for practice priorities
-
 ### 📋 Sessions Page
 - Table viewer for raw shot data
 - Built-in practice log to capture notes and drills
@@ -40,7 +35,6 @@ GarminR10Analyzer-main/
 ├── pages/
 │   ├── 0_Analysis.py           # Overview + benchmarking
 │   ├── 1_Sessions.py           # Viewer + practice log
-│   ├── 2_Benchmark_Report.py   # 🔥 Benchmark coaching report
 │   └── 3_AI_Feedback.py        # AI summaries and coaching
 ├── utils/
 │   └── benchmarks.py           # Performance goals and evaluator
@@ -96,13 +90,14 @@ Ensure your CSV contains these columns (from Garmin R10 export):
 
 
 ---
-### 🔐 OpenAI API Key Setup
-To use the AI Feedback feature, set your OpenAI API key as an environment variable:
+### 🔐 OpenAI Setup
+To use the AI Feedback features, set the following environment variables:
 
 ```
-OPENAI_API_KEY=your_key_here
+export OPENAI_API_KEY=your_key_here
+export OPENAI_ASSISTANT_ID=your_assistant_id
 ```
-This is securely accessed via `os.getenv()`.
+These values are accessed via `os.getenv()`.
 
 ---
 
