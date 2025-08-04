@@ -19,27 +19,51 @@ def coerce_numeric(series, errors: str = "coerce"):
 def remove_outliers(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     """Return ``df`` with outliers removed for the given ``cols``.
 
-    Outliers are detected using the 1.5 * IQR rule for each column. Rows
-    outside the acceptable range for any provided column are dropped. Columns
-    that are not present in ``df`` are ignored. ``df`` is not modified in
-    place.
+    The 1.5 * IQR rule is applied per column. When a club column (``club`` or
+    ``Club``) is present, the rule is evaluated within each club so that
+    legitimate shots for one club are not discarded because of another club's
+    distances. Rows falling outside the acceptable range for **any** provided
+    column are dropped. Columns not present in ``df`` are ignored. ``df`` is
+    not modified in place.
     """
 
     filtered = df.copy()
-    for col in cols:
-        if col not in filtered.columns:
-            continue
-        # Use the full column for masking so index alignment is preserved
-        series = coerce_numeric(filtered[col])
-        valid = series.dropna()
-        if valid.empty:
-            continue
-        q1 = valid.quantile(0.25)
-        q3 = valid.quantile(0.75)
-        iqr = q3 - q1
-        lower = q1 - 1.5 * iqr
-        upper = q3 + 1.5 * iqr
-        mask = series.between(lower, upper) | series.isna()
+    group_col = None
+    for candidate in ("club", "Club"):
+        if candidate in filtered.columns:
+            group_col = candidate
+            break
+
+    def _apply_rule(subset: pd.DataFrame) -> pd.Series:
+        mask = pd.Series(True, index=subset.index)
+        for col in cols:
+            if col not in subset.columns:
+                continue
+            series = coerce_numeric(subset[col])
+            valid = series.dropna()
+            if len(valid) < 3:
+                continue
+            median = valid.median()
+            mad = (valid - median).abs().median()
+            if mad > 0:
+                z = 0.6745 * (series - median) / mad
+                mask &= (z.abs() <= 3) | series.isna()
+            else:
+                q1 = valid.quantile(0.25)
+                q3 = valid.quantile(0.75)
+                iqr = q3 - q1
+                lower = q1 - 1.5 * iqr
+                upper = q3 + 1.5 * iqr
+                mask &= (series.between(lower, upper)) | series.isna()
+        return mask
+
+    if group_col:
+        mask = pd.Series(True, index=filtered.index)
+        for _, group in filtered.groupby(group_col):
+            mask.loc[group.index] = _apply_rule(group)
+        filtered = filtered.loc[mask]
+    else:
+        mask = _apply_rule(filtered)
         filtered = filtered.loc[mask]
     return filtered
 

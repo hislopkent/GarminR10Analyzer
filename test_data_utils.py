@@ -22,6 +22,21 @@ def test_remove_outliers_multiple_columns():
     assert len(filtered) == 4
 
 
+def test_remove_outliers_groups_by_club():
+    df = pd.DataFrame(
+        {
+            'club': ['Driver', 'Driver', 'Driver', 'Wedge', 'Wedge'],
+            'carry': [200, 210, 50, 50, 52],
+        }
+    )
+    filtered = remove_outliers(df, ['carry'])
+    driver_carries = filtered[filtered['club'] == 'Driver']['carry']
+    wedge_carries = filtered[filtered['club'] == 'Wedge']['carry']
+    assert 50 not in driver_carries.values
+    # Wedge distances should be preserved
+    assert 50 in wedge_carries.values
+
+
 def test_derive_offline_distance_from_side():
     df = pd.DataFrame({"Side Distance": [5, -3]})
     result = derive_offline_distance(df)
