@@ -26,6 +26,15 @@ for col in [
     if col in df.columns:
         df[col] = coerce_numeric(df[col])
 
+uploaded_files = st.session_state.get("uploaded_files", [])
+if (
+    "ai_files_snapshot" in st.session_state
+    and set(st.session_state["ai_files_snapshot"]) != set(uploaded_files)
+):
+    st.warning(
+        "⚠️ New CSV files detected since last AI run. Regenerate to include them."
+    )
+
 insight_tab, session_tab = st.tabs(["Club Insight", "Practice Summary"])
 
 with insight_tab:
@@ -38,6 +47,7 @@ with insight_tab:
             )
             feedback = generate_ai_summary(selected_club, sampled)
             st.session_state[f"ai_{selected_club}"] = feedback
+            st.session_state["ai_files_snapshot"] = uploaded_files
             st.success("✅ Summary generated!")
     cached = st.session_state.get(f"ai_{selected_club}")
     if cached:
@@ -45,7 +55,12 @@ with insight_tab:
         st.write(cached)
 
 with session_tab:
-    results = analyze_practice_session(df)
+    if st.button("Generate Practice Summary"):
+        with st.spinner("Analyzing practice session..."):
+            st.session_state["practice_summary"] = analyze_practice_session(df)
+            st.session_state["ai_files_snapshot"] = uploaded_files
+            st.success("✅ Summary generated!")
+    results = st.session_state.get("practice_summary", [])
     for entry in results:
         st.subheader(f"📌 {entry['club']}")
         st.markdown("**AI Summary:**")
