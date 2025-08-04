@@ -69,7 +69,10 @@ Explain what this means for my consistency and what to do in practice. Be specif
             assistant_id=assistant_id,
         )
         import time
+        timeout = time.time() + 30  # seconds
         while run.status not in ["completed", "failed", "cancelled", "expired"]:
+            if time.time() > timeout:
+                return "⚠️ AI summary error: timeout"
             time.sleep(1)
             run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
         if run.status == "completed":
@@ -162,8 +165,10 @@ def generate_ai_batch_summaries(df) -> Dict[str, str]:
             assistant_id=assistant_id,
         )
         import time
-
+        timeout = time.time() + 30  # seconds
         while run.status not in ["completed", "failed", "cancelled", "expired"]:
+            if time.time() > timeout:
+                return {club: "⚠️ AI summary error: timeout" for club in clubs}
             time.sleep(1)
             run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
 

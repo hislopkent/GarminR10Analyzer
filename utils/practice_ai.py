@@ -99,6 +99,12 @@ def analyze_club_stats(
             f"You're missing right {right_bias:.0f}% of the time — face/path issue likely."
         )
 
+    if not np.isnan(avg_offline) and abs(avg_offline) > 10:
+        direction = "left" if avg_offline < 0 else "right"
+        feedback.append(
+            f"Average shot is {abs(avg_offline):.0f} yds {direction} of target."
+        )
+
     if std_carry > 15:
         feedback.append("High carry distance variability suggests inconsistent contact.")
 
@@ -123,11 +129,22 @@ def analyze_club_stats(
                     f"Best good carry: {max_good_carry:.0f} yds (target {benchmark_carry} yds)."
                 )
 
+    if (
+        benchmark_carry is not None
+        and not np.isnan(avg_carry)
+        and avg_carry < 0.8 * benchmark_carry
+    ):
+        feedback.append(
+            f"Average carry {avg_carry:.0f} yds is below target {benchmark_carry} yds."
+        )
+
     return {
         "club": club,
         "summary": summarize_with_ai(club, feedback),
         "issues": feedback,
         "max_good_carry": max_good_carry,
+        "avg_carry": avg_carry,
+        "avg_offline": avg_offline,
     }
 
 def summarize_with_ai(club: str, issues: list[str]) -> str:

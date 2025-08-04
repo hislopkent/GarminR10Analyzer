@@ -34,17 +34,25 @@ def persist_state() -> None:
         "files": st.session_state.get("uploaded_files", []),
         "df": st.session_state.get("session_df", pd.DataFrame()),
     }
-    with open(CACHE_PATH, "wb") as f:
-        pickle.dump(data, f)
-    logger.info("State persisted with %d file(s)", len(data["files"]))
+    try:
+        os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
+        with open(CACHE_PATH, "wb") as f:
+            pickle.dump(data, f)
+        logger.info("State persisted with %d file(s)", len(data["files"]))
+    except OSError as exc:  # pragma: no cover - filesystem errors are rare
+        logger.warning("Failed to persist state: %s", exc)
 
 
 def load_state() -> None:
     """Load previously persisted session state from disk if it exists."""
 
     if os.path.exists(CACHE_PATH):
-        with open(CACHE_PATH, "rb") as f:
-            data = pickle.load(f)
+        try:
+            with open(CACHE_PATH, "rb") as f:
+                data = pickle.load(f)
+        except OSError as exc:  # pragma: no cover - rare
+            logger.warning("Failed to load cached state: %s", exc)
+            return
         st.session_state["uploaded_files"] = data.get("files", [])
         st.session_state["session_df"] = data.get("df", pd.DataFrame())
         st.session_state["df_all"] = st.session_state["session_df"]
@@ -124,9 +132,13 @@ def remove_file(name: str) -> None:
     if name in st.session_state["uploaded_files"]:
         st.session_state["uploaded_files"].remove(name)
         if "session_df" in st.session_state and not st.session_state["session_df"].empty:
-            st.session_state["session_df"] = st.session_state["session_df"][
-                st.session_state["session_df"]["Session Name"] != name
-            ]
+            session_df = st.session_state["session_df"]
+            if "Session Name" in session_df.columns:
+                st.session_state["session_df"] = session_df[
+                    session_df["Session Name"] != name
+                ]
+            else:
+                logger.warning("Missing 'Session Name' column while removing %s", name)
             st.session_state["df_all"] = st.session_state["session_df"]
             if "Club" in st.session_state["session_df"].columns:
                 st.session_state["club_data"] = {
