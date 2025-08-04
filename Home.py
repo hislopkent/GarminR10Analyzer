@@ -133,12 +133,18 @@ def remove_file(name: str) -> None:
         st.session_state["uploaded_files"].remove(name)
         if "session_df" in st.session_state and not st.session_state["session_df"].empty:
             session_df = st.session_state["session_df"]
-            if "Session Name" in session_df.columns:
+            if "Source File" in session_df.columns:
+                st.session_state["session_df"] = session_df[
+                    session_df["Source File"] != name
+                ]
+            elif "Session Name" in session_df.columns:
                 st.session_state["session_df"] = session_df[
                     session_df["Session Name"] != name
                 ]
             else:
-                logger.warning("Missing 'Session Name' column while removing %s", name)
+                logger.warning(
+                    "Missing 'Source File' column while removing %s", name
+                )
             st.session_state["df_all"] = st.session_state["session_df"]
             if "Club" in st.session_state["session_df"].columns:
                 st.session_state["club_data"] = {
