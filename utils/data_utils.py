@@ -40,3 +40,26 @@ def remove_outliers(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
         mask = series.between(lower, upper)
         filtered = filtered.loc[mask]
     return filtered
+
+
+def derive_offline_distance(df: pd.DataFrame) -> pd.DataFrame:
+    """Return ``df`` with an ``Offline`` column if possible.
+
+    Garmin CSV exports are inconsistent in naming lateral dispersion metrics.
+    Some provide ``Side`` or ``Side Distance`` instead of ``Offline``.  This
+    helper inspects these alternate columns and, when found, copies the values
+    into a new ``Offline`` column.  The input dataframe is not modified in
+    place.
+    """
+
+    df = df.copy()
+    offline_present = any(col in df.columns for col in ("Offline", "Offline Distance"))
+    if offline_present:
+        return df
+
+    for col in ("Side Distance", "Side"):
+        if col in df.columns:
+            df["Offline"] = coerce_numeric(df[col])
+            break
+
+    return df

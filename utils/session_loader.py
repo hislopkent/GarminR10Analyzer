@@ -3,6 +3,8 @@
 import pandas as pd
 import io
 
+from .data_utils import derive_offline_distance
+
 
 def load_sessions(files):
     """Return a concatenated dataframe from uploaded CSV ``files``.
@@ -39,6 +41,7 @@ def load_sessions(files):
             # Normalise club column name
             if "Club" not in df.columns and "Club Type" in df.columns:
                 df["Club"] = df["Club Type"]
+            df = derive_offline_distance(df)
             dfs.append(df)
         except Exception as e:
             print(f"Failed to load {getattr(file, 'name', 'unknown')}: {e}")

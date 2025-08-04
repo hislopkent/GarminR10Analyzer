@@ -5,7 +5,7 @@ import plotly.express as px
 import streamlit as st
 
 from utils.logger import logger
-from utils.data_utils import coerce_numeric
+from utils.data_utils import coerce_numeric, remove_outliers
 from utils.page_utils import require_data
 from utils.responsive import configure_page
 
@@ -39,6 +39,9 @@ df = raw_df.rename(columns={k: v for k, v in col_map.items() if k in raw_df.colu
 # same target. Remove duplicates so downstream selections return Series objects.
 df = df.loc[:, ~df.columns.duplicated()]
 
+if "offline_distance" not in df.columns and "side_distance" in df.columns:
+    df["offline_distance"] = df["side_distance"]
+
 for col in [
     "carry_distance",
     "total_distance",
@@ -52,19 +55,58 @@ for col in [
     if col in df.columns:
         df[col] = coerce_numeric(df[col])
 
+session_names = df["session_name"].dropna().unique().tolist()
+session_option = st.selectbox(
+    "Choose sessions to analyze",
+    ["All Sessions", "Latest Session", "Last 5 Sessions", "Select Sessions"],
+)
+
+if "Date" in df.columns:
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
+if session_option == "All Sessions":
+    df_filtered = df
+elif session_option == "Latest Session":
+    if "Date" in df.columns and df["Date"].notna().any():
+        latest_session = df.loc[df["Date"].idxmax(), "session_name"]
+    else:
+        latest_session = session_names[-1] if session_names else None
+    df_filtered = df[df["session_name"] == latest_session] if latest_session else df.iloc[0:0]
+elif session_option == "Last 5 Sessions":
+    if "Date" in df.columns and df["Date"].notna().any():
+        session_order = (
+            df.drop_duplicates("session_name").sort_values("Date")
+        )["session_name"].tolist()
+    else:
+        session_order = session_names
+    last_sessions = session_order[-5:]
+    df_filtered = df[df["session_name"].isin(last_sessions)]
+else:  # Select Sessions
+    chosen = st.multiselect("Select session(s)", session_names)
+    df_filtered = (
+        df[df["session_name"].isin(chosen)] if chosen else df.iloc[0:0]
+    )
+
+filter_outliers = st.checkbox("Filter outliers", value=False)
+if filter_outliers:
+    numeric_cols = [
+        "carry_distance",
+        "total_distance",
+        "ball_speed",
+        "launch_angle",
+        "spin_rate",
+        "apex_height",
+        "side_distance",
+        "offline_distance",
+    ]
+    cols_present = [c for c in numeric_cols if c in df_filtered.columns]
+    df_filtered = remove_outliers(df_filtered, cols_present)
+
 overview_tab, benchmark_tab = st.tabs(["Overview", "Benchmarking"])
 
 # ---------------------------------------------------------------------------
 with overview_tab:
     st.subheader("Club Performance Overview")
-
-    sessions = df["session_name"].dropna().unique().tolist()
-    selected_session = st.selectbox(
-        "Select Session", options=["All Sessions"] + sessions
-    )
-    df_filtered = (
-        df if selected_session == "All Sessions" else df[df["session_name"] == selected_session]
-    )
 
     club_summary = df_filtered.groupby("club").agg(
         total_shots=("carry_distance", "count"),
@@ -143,64 +185,66 @@ with benchmark_tab:
         "launch_angle",
         "spin_rate",
     ]
-    missing = [c for c in required if c not in df.columns]
+    missing = [c for c in required if c not in df_filtered.columns]
     if missing:
         st.error("❌ Missing required columns: " + ", ".join(missing))
         st.stop()
 
-    clubs = sorted(df["club"].dropna().unique())
+    clubs = sorted(df_filtered["club"].dropna().unique())
     selected_club = st.selectbox("Select Club", clubs)
-    session_options = ["All Sessions"] + sorted(df["session_name"].dropna().unique())
+    session_options = ["All Sessions"] + sorted(
+        df_filtered["session_name"].dropna().unique()
+    )
     selected_session_bm = st.selectbox(
         "Filter by Session", session_options, key="bm_session"
     )
-    df_filtered = df[df["club"] == selected_club]
+    club_df = df_filtered[df_filtered["club"] == selected_club]
     if selected_session_bm != "All Sessions":
-        df_filtered = df_filtered[df_filtered["session_name"] == selected_session_bm]
+        club_df = club_df[club_df["session_name"] == selected_session_bm]
 
     has_offline = (
-        "offline_distance" in df_filtered.columns
-        and df_filtered["offline_distance"].notna().any()
+        "offline_distance" in club_df.columns
+        and club_df["offline_distance"].notna().any()
     )
 
     st.markdown("### Shot Metrics")
     metrics = [
         {
             "Metric": "Carry Distance",
-            "Average": df_filtered["carry_distance"].mean(),
-            "Std Dev": df_filtered["carry_distance"].std(),
+            "Average": club_df["carry_distance"].mean(),
+            "Std Dev": club_df["carry_distance"].std(),
         },
         {
             "Metric": "Ball Speed",
-            "Average": df_filtered["ball_speed"].mean(),
-            "Std Dev": df_filtered["ball_speed"].std(),
+            "Average": club_df["ball_speed"].mean(),
+            "Std Dev": club_df["ball_speed"].std(),
         },
         {
             "Metric": "Launch Angle",
-            "Average": df_filtered["launch_angle"].mean(),
-            "Std Dev": df_filtered["launch_angle"].std(),
+            "Average": club_df["launch_angle"].mean(),
+            "Std Dev": club_df["launch_angle"].std(),
         },
         {
             "Metric": "Spin Rate",
-            "Average": df_filtered["spin_rate"].mean(),
-            "Std Dev": df_filtered["spin_rate"].std(),
+            "Average": club_df["spin_rate"].mean(),
+            "Std Dev": club_df["spin_rate"].std(),
         },
     ]
     if has_offline:
         metrics.append(
             {
                 "Metric": "Offline Distance",
-                "Average": df_filtered["offline_distance"].mean(),
-                "Std Dev": df_filtered["offline_distance"].std(),
+                "Average": club_df["offline_distance"].mean(),
+                "Std Dev": club_df["offline_distance"].std(),
             }
         )
-    if "total_distance" in df_filtered:
+    if "total_distance" in club_df:
         metrics.insert(
             1,
             {
                 "Metric": "Total Distance",
-                "Average": df_filtered["total_distance"].mean(),
-                "Std Dev": df_filtered["total_distance"].std(),
+                "Average": club_df["total_distance"].mean(),
+                "Std Dev": club_df["total_distance"].std(),
             },
         )
 
@@ -214,7 +258,7 @@ with benchmark_tab:
         st.info("Offline distance metrics not available.")
 
     fig_hist = px.histogram(
-        df_filtered,
+        club_df,
         x="carry_distance",
         nbins=20,
         title=f"Carry Distance Distribution – {selected_club}",
@@ -224,7 +268,7 @@ with benchmark_tab:
 
     if has_offline:
         fig_disp = px.scatter(
-            df_filtered,
+            club_df,
             x="offline_distance",
             y="carry_distance",
             title=f"Dispersion Plot – {selected_club}",
@@ -242,8 +286,8 @@ with benchmark_tab:
         st.info("Offline distance data not available for dispersion plot.")
 
     st.markdown("## 🧠 Coach’s Feedback")
-    carry_std = df_filtered["carry_distance"].std()
-    offline_std = df_filtered["offline_distance"].std() if has_offline else None
+    carry_std = club_df["carry_distance"].std()
+    offline_std = club_df["offline_distance"].std() if has_offline else None
 
     if pd.notna(carry_std) and carry_std > 15:
         st.warning(
