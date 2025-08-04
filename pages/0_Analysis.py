@@ -117,6 +117,8 @@ with overview_tab:
         avg_spin_rate=("spin_rate", "mean"),
     ).reset_index()
 
+    club_summary = club_summary[club_summary["total_shots"] >= 6]
+
     st.dataframe(
         club_summary.style.format(
             {
@@ -140,13 +142,14 @@ with overview_tab:
     fig_carry.update_traces(texttemplate="%{text:.1f}", textposition="outside")
     st.plotly_chart(fig_carry, use_container_width=True)
 
-    fig_pie = px.pie(
-        club_summary,
-        values="total_shots",
-        names="club",
-        title="Shot Volume by Club",
-    )
-    st.plotly_chart(fig_pie, use_container_width=True)
+    if not club_summary.empty:
+        fig_pie = px.pie(
+            club_summary,
+            values="total_shots",
+            names="club",
+            title="Shot Volume by Club",
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
 
     st.markdown("## ⚠️ Inconsistency Warning")
     high_variability = club_summary.sort_values("std_carry", ascending=False).head(3)
@@ -167,7 +170,8 @@ with overview_tab:
                 "Check contact quality and ball-first strike."
             )
 
-    for club, club_df in df_filtered.groupby("club"):
+    for club in club_summary["club"]:
+        club_df = df_filtered[df_filtered["club"] == club]
         with st.expander(f"{club} details"):
             st.write(
                 club_df[["carry_distance", "ball_speed", "launch_angle", "spin_rate"]].describe()
