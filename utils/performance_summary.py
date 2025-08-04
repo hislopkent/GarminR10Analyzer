@@ -113,8 +113,8 @@ def summarize_performance(df: pd.DataFrame) -> str:
 
     misses = MissCounts()
     if carry_col or "Offline" in df.columns:
-        for _, row in df.iterrows():
-            distance, direction = _determine_miss(row, carry_col or "Carry Distance")
+        for row in df.itertuples(index=False):
+            distance, direction = _determine_miss(row._asdict(), carry_col or "Carry Distance")
             if distance == "short" and direction == "right":
                 misses.short_right += 1
             elif distance == "short" and direction == "left":

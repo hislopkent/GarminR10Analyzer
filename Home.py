@@ -37,10 +37,21 @@ def persist_state() -> None:
     try:
         os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
         with open(CACHE_PATH, "wb") as f:
-            pickle.dump(data, f)
+            pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
         logger.info("State persisted with %d file(s)", len(data["files"]))
     except OSError as exc:  # pragma: no cover - filesystem errors are rare
         logger.warning("Failed to persist state: %s", exc)
+
+
+def _refresh_session_views() -> None:
+    """Recompute derived session state like ``df_all`` and ``club_data``."""
+
+    df = st.session_state.get("session_df", pd.DataFrame())
+    st.session_state["df_all"] = df
+    if "Club" in df.columns:
+        st.session_state["club_data"] = {club: grp for club, grp in df.groupby("Club")}
+    else:
+        st.session_state["club_data"] = {}
 
 
 def load_state() -> None:
@@ -55,14 +66,7 @@ def load_state() -> None:
             return
         st.session_state["uploaded_files"] = data.get("files", [])
         st.session_state["session_df"] = data.get("df", pd.DataFrame())
-        st.session_state["df_all"] = st.session_state["session_df"]
-        if "Club" in st.session_state["session_df"].columns:
-            st.session_state["club_data"] = {
-                club: grp
-                for club, grp in st.session_state["session_df"].groupby("Club")
-            }
-        else:
-            st.session_state["club_data"] = {}
+        _refresh_session_views()
 
 
 def _rerun() -> None:
@@ -104,14 +108,7 @@ if uploaded_files:
                 )
             else:
                 st.session_state["session_df"] = df_new
-            st.session_state["df_all"] = st.session_state["session_df"]
-            if "Club" in st.session_state["session_df"].columns:
-                st.session_state["club_data"] = {
-                    club: grp
-                    for club, grp in st.session_state["session_df"].groupby("Club")
-                }
-            else:
-                st.session_state["club_data"] = {}
+            _refresh_session_views()
         st.session_state["uploaded_files"].extend([f.name for f in new_files])
         persist_state()
         st.success(
@@ -145,14 +142,7 @@ def remove_file(name: str) -> None:
                 logger.warning(
                     "Missing 'Source File' column while removing %s", name
                 )
-            st.session_state["df_all"] = st.session_state["session_df"]
-            if "Club" in st.session_state["session_df"].columns:
-                st.session_state["club_data"] = {
-                    club: grp
-                    for club, grp in st.session_state["session_df"].groupby("Club")
-                }
-            else:
-                st.session_state["club_data"] = {}
+            _refresh_session_views()
         persist_state()
         _rerun()
 

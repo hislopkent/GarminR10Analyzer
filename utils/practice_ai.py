@@ -7,8 +7,17 @@ import os
 from .data_utils import coerce_numeric, remove_outliers
 from .benchmarks import get_benchmarks
 
-api_key = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=api_key) if api_key else None
+
+def _get_client() -> OpenAI | None:
+    """Return an OpenAI client if an API key is configured."""
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return None
+    try:
+        return OpenAI(api_key=api_key)
+    except Exception:
+        return None
 
 
 def analyze_club_stats(
@@ -153,6 +162,7 @@ def summarize_with_ai(club: str, issues: list[str]) -> str:
     if not issues:
         return f"Your {club} data looks solid — no major red flags detected. Nice work!"
 
+    client = _get_client()
     if client is None:
         return "(AI summary disabled: no API key)"
 

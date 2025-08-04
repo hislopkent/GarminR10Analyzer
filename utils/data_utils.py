@@ -28,43 +28,39 @@ def remove_outliers(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     """
 
     filtered = df.copy()
-    group_col = None
-    for candidate in ("club", "Club"):
-        if candidate in filtered.columns:
-            group_col = candidate
-            break
+    group_col = next((c for c in ("club", "Club") if c in filtered.columns), None)
 
-    def _apply_rule(subset: pd.DataFrame) -> pd.Series:
-        mask = pd.Series(True, index=subset.index)
-        for col in cols:
-            if col not in subset.columns:
-                continue
-            series = coerce_numeric(subset[col])
-            valid = series.dropna()
-            if len(valid) < 3:
-                continue
-            median = valid.median()
-            mad = (valid - median).abs().median()
-            if mad > 0:
-                z = 0.6745 * (series - median) / mad
-                mask &= (z.abs() <= 3) | series.isna()
-            else:
-                q1 = valid.quantile(0.25)
-                q3 = valid.quantile(0.75)
-                iqr = q3 - q1
-                lower = q1 - 1.5 * iqr
-                upper = q3 + 1.5 * iqr
-                mask &= (series.between(lower, upper)) | series.isna()
-        return mask
+    def _mask(series: pd.Series) -> pd.Series:
+        valid = series.dropna()
+        if len(valid) < 3:
+            return pd.Series(True, index=series.index)
+        median = valid.median()
+        mad = (valid - median).abs().median()
+        if mad > 0:
+            z = 0.6745 * (series - median) / mad
+            return (z.abs() <= 3) | series.isna()
+        q1 = valid.quantile(0.25)
+        q3 = valid.quantile(0.75)
+        iqr = q3 - q1
+        lower = q1 - 1.5 * iqr
+        upper = q3 + 1.5 * iqr
+        return series.between(lower, upper) | series.isna()
 
-    if group_col:
-        mask = pd.Series(True, index=filtered.index)
-        for _, group in filtered.groupby(group_col):
-            mask.loc[group.index] = _apply_rule(group)
-        filtered = filtered.loc[mask]
-    else:
-        mask = _apply_rule(filtered)
-        filtered = filtered.loc[mask]
+    masks = []
+    for col in cols:
+        if col not in filtered.columns:
+            continue
+        series = coerce_numeric(filtered[col])
+        if group_col:
+            mask = filtered.groupby(group_col)[col].transform(lambda s: _mask(s))
+        else:
+            mask = _mask(series)
+        masks.append(mask)
+
+    if masks:
+        combined = pd.concat(masks, axis=1).all(axis=1)
+        filtered = filtered.loc[combined]
+
     return filtered
 
 
