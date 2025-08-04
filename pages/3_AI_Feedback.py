@@ -7,8 +7,10 @@ from utils.data_utils import coerce_numeric
 from utils.ai_feedback import generate_ai_summary
 from utils.practice_ai import analyze_practice_session
 from utils.page_utils import require_data
+from utils.responsive import configure_page
 
 logger.info("📄 Page loaded: AI Feedback")
+configure_page()
 st.title("🧠 AI Feedback")
 
 df = require_data().copy()
