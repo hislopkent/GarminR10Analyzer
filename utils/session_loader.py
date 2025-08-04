@@ -6,6 +6,7 @@ from typing import List
 import pandas as pd
 
 from .data_utils import derive_offline_distance
+from .logger import logger
 
 
 def load_sessions(files: List[object]) -> pd.DataFrame:
@@ -19,7 +20,8 @@ def load_sessions(files: List[object]) -> pd.DataFrame:
 
     Each file is read into a dataframe, normalised so that a ``Club`` column is
     always present and annotated with session metadata. Any files that fail to
-    parse are skipped with a printed warning.
+    parse are skipped with a logged warning so errors are captured in
+    ``app.log``.
     """
 
     sessions = []
@@ -44,7 +46,7 @@ def load_sessions(files: List[object]) -> pd.DataFrame:
             else:
                 content = str(raw)
 
-            df = pd.read_csv(io.StringIO(content))
+            df = pd.read_csv(io.StringIO(content), on_bad_lines="skip")
             # Normalise club column name
             if "Club" not in df.columns and "Club Type" in df.columns:
                 df["Club"] = df["Club Type"]
@@ -62,7 +64,9 @@ def load_sessions(files: List[object]) -> pd.DataFrame:
                 "file_name": getattr(file, "name", "Unknown"),
             })
         except Exception as e:
-            print(f"Failed to load {getattr(file, 'name', 'unknown')}: {e}")
+            logger.warning(
+                "Failed to load %s: %s", getattr(file, "name", "unknown"), e
+            )
 
     if not sessions:
         return pd.DataFrame()

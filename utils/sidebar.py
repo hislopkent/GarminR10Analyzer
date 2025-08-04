@@ -1,4 +1,5 @@
 import streamlit as st
+from pathlib import Path
 
 
 def render_sidebar() -> None:
@@ -11,5 +12,7 @@ def render_sidebar() -> None:
     st.sidebar.page_link("Home.py", label="🏠 Home")
     st.sidebar.page_link("pages/0_Analysis.py", label="📈 Analysis")
     st.sidebar.page_link("pages/1_Sessions.py", label="📋 Sessions")
-    st.sidebar.page_link("pages/2_Benchmark_Report.py", label="📌 Benchmark Report")
+    benchmark_page = Path("pages/2_Benchmark_Report.py")
+    if benchmark_page.exists():
+        st.sidebar.page_link(str(benchmark_page), label="📌 Benchmark Report")
     st.sidebar.page_link("pages/3_AI_Feedback.py", label="🧠 AI Feedback")

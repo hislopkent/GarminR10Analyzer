@@ -15,54 +15,55 @@ st.title("📈 Analysis")
 
 # Load and standardise data -------------------------------------------------
 raw_df = require_data().copy()
-col_map = {
-    "Session Name": "session_name",
-    "Club": "club",
-    "Club Type": "club",
-    "Carry Distance": "carry_distance",
-    "Carry": "carry_distance",
-    "Total Distance": "total_distance",
-    "Ball Speed": "ball_speed",
-    "Launch Angle": "launch_angle",
-    "Backspin": "spin_rate",
-    "Spin Rate": "spin_rate",
-    "Apex Height": "apex_height",
-    "Apex": "apex_height",
-    "Side": "side_distance",
-    "Side Distance": "side_distance",
-    "Offline Distance": "offline_distance",
-    "Offline": "offline_distance",
-}
 
-df = raw_df.rename(columns={k: v for k, v in col_map.items() if k in raw_df.columns})
-# ``rename`` may create duplicate columns when multiple source names map to the
-# same target. Remove duplicates so downstream selections return Series objects.
-df = df.loc[:, ~df.columns.duplicated()]
 
-if "offline_distance" not in df.columns and "side_distance" in df.columns:
-    df["offline_distance"] = df["side_distance"]
+@st.cache_data
+def _standardize(df: pd.DataFrame) -> pd.DataFrame:
+    col_map = {
+        "Session Name": "session_name",
+        "Club": "club",
+        "Club Type": "club",
+        "Carry Distance": "carry_distance",
+        "Carry": "carry_distance",
+        "Total Distance": "total_distance",
+        "Ball Speed": "ball_speed",
+        "Launch Angle": "launch_angle",
+        "Backspin": "spin_rate",
+        "Spin Rate": "spin_rate",
+        "Apex Height": "apex_height",
+        "Apex": "apex_height",
+        "Side": "side_distance",
+        "Side Distance": "side_distance",
+        "Offline Distance": "offline_distance",
+        "Offline": "offline_distance",
+    }
+    df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+    df = df.loc[:, ~df.columns.duplicated()]
+    if "offline_distance" not in df.columns and "side_distance" in df.columns:
+        df["offline_distance"] = df["side_distance"]
+    for col in [
+        "carry_distance",
+        "total_distance",
+        "ball_speed",
+        "launch_angle",
+        "spin_rate",
+        "apex_height",
+        "side_distance",
+        "offline_distance",
+    ]:
+        if col in df.columns:
+            df[col] = coerce_numeric(df[col])
+    if "Date" in df.columns:
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    return df
 
-for col in [
-    "carry_distance",
-    "total_distance",
-    "ball_speed",
-    "launch_angle",
-    "spin_rate",
-    "apex_height",
-    "side_distance",
-    "offline_distance",
-]:
-    if col in df.columns:
-        df[col] = coerce_numeric(df[col])
 
+df = _standardize(raw_df)
 session_names = df["session_name"].dropna().unique().tolist()
 session_option = st.selectbox(
     "Choose sessions to analyze",
     ["All Sessions", "Latest Session", "Last 5 Sessions", "Select Sessions"],
 )
-
-if "Date" in df.columns:
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
 if session_option == "All Sessions":
     df_filtered = df
@@ -88,8 +89,15 @@ else:  # Select Sessions
     )
 
 filter_outliers = st.checkbox("Filter outliers", value=True)
+
+
+@st.cache_data
+def _apply_outlier_filter(df: pd.DataFrame, cols: tuple[str, ...]) -> pd.DataFrame:
+    return remove_outliers(df, list(cols))
+
+
 if filter_outliers:
-    numeric_cols = [
+    numeric_cols = (
         "carry_distance",
         "total_distance",
         "ball_speed",
@@ -98,9 +106,9 @@ if filter_outliers:
         "apex_height",
         "side_distance",
         "offline_distance",
-    ]
-    cols_present = [c for c in numeric_cols if c in df_filtered.columns]
-    df_filtered = remove_outliers(df_filtered, cols_present)
+    )
+    cols_present = tuple(c for c in numeric_cols if c in df_filtered.columns)
+    df_filtered = _apply_outlier_filter(df_filtered, cols_present)
 
 overview_tab, benchmark_tab = st.tabs(["Overview", "Benchmarking"])
 
