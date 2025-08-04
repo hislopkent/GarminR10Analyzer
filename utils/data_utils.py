@@ -29,15 +29,17 @@ def remove_outliers(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     for col in cols:
         if col not in filtered.columns:
             continue
-        series = coerce_numeric(filtered[col]).dropna()
-        if series.empty:
+        # Use the full column for masking so index alignment is preserved
+        series = coerce_numeric(filtered[col])
+        valid = series.dropna()
+        if valid.empty:
             continue
-        q1 = series.quantile(0.25)
-        q3 = series.quantile(0.75)
+        q1 = valid.quantile(0.25)
+        q3 = valid.quantile(0.75)
         iqr = q3 - q1
         lower = q1 - 1.5 * iqr
         upper = q3 + 1.5 * iqr
-        mask = series.between(lower, upper)
+        mask = series.between(lower, upper) | series.isna()
         filtered = filtered.loc[mask]
     return filtered
 
