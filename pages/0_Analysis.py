@@ -5,7 +5,12 @@ import plotly.express as px
 import streamlit as st
 
 from utils.logger import logger
-from utils.data_utils import coerce_numeric, remove_outliers, classify_shots
+from utils.data_utils import (
+    coerce_numeric,
+    remove_outliers,
+    classify_shots,
+    IsolationForest,
+)
 from utils.constants import COLUMN_NORMALIZATION_MAP
 from utils.page_utils import require_data
 from utils.responsive import configure_page
@@ -78,7 +83,7 @@ if exclude:
     df_filtered = df_filtered[~df_filtered["session_name"].isin(exclude)]
 
 filter_outliers = st.checkbox(
-    "Remove statistical outliers",
+    "Remove outliers",
     value=True,
     help="Drop shots with extreme values so a few wild swings don't skew averages",
 )
@@ -86,9 +91,9 @@ filter_outliers = st.checkbox(
 
 @st.cache_data
 def _apply_outlier_filter(
-    df: pd.DataFrame, cols: tuple[str, ...], z: float
+    df: pd.DataFrame, cols: tuple[str, ...], z: float, method: str
 ) -> pd.DataFrame:
-    return remove_outliers(df, list(cols), z_thresh=z)
+    return remove_outliers(df, list(cols), z_thresh=z, method=method)
 
 
 if filter_outliers:
@@ -106,10 +111,22 @@ if filter_outliers:
     col_sel = st.multiselect(
         "Outlier metrics", cols_present, default=cols_present
     )
-    z_thresh = st.slider("Z-score threshold", 1.0, 5.0, 3.0)
+    method_choice = st.radio(
+        "Outlier detection",
+        ["Statistical", "Adaptive"],
+        help="Statistical uses z-scores/IQR; Adaptive uses Isolation Forest",
+    )
+    method = "isolation" if method_choice == "Adaptive" else "mad"
+    if method == "isolation" and IsolationForest is None:
+        st.warning("scikit-learn required for adaptive method; using statistical instead")
+        method = "mad"
+    if method == "mad":
+        z_thresh = st.slider("Z-score threshold", 1.0, 5.0, 3.0)
+    else:
+        z_thresh = 3.0
     if col_sel:
         df_filtered = _apply_outlier_filter(
-            df_filtered, tuple(col_sel), z_thresh
+            df_filtered, tuple(col_sel), z_thresh, method
         )
 
 df_filtered = classify_shots(

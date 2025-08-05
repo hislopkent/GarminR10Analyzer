@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 from utils.data_utils import remove_outliers, derive_offline_distance, classify_shots
 
 def test_remove_outliers_drops_extreme_values():
@@ -43,6 +44,13 @@ def test_remove_outliers_custom_threshold():
     assert 10 not in tight['Metric'].values
     loose = remove_outliers(df, ['Metric'], z_thresh=10.0)
     assert 10 in loose['Metric'].values
+
+
+def test_remove_outliers_isolation_forest():
+    pytest.importorskip("sklearn")
+    df = pd.DataFrame({'Metric': [10, 11, 9, 12, 10, 11, 9, 12, 10, 11, 10, 11, 9, 12, 10, 11, 9, 12, 10, 11, 50]})
+    filtered = remove_outliers(df, ['Metric'], method='isolation')
+    assert 50 not in filtered['Metric'].values
 
 
 def test_derive_offline_distance_from_side():
