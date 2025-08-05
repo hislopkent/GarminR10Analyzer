@@ -47,40 +47,35 @@ def remove_outliers(
     """
 
     filtered = df.copy()
+    cols = [c for c in cols if c in filtered.columns]
+    if not cols:
+        return filtered
+
+    numeric = filtered[cols].apply(coerce_numeric)
     group_col = next((c for c in ("club", "Club") if c in filtered.columns), None)
 
-    def _mask(series: pd.Series) -> pd.Series:
-        valid = series.dropna()
-        if len(valid) < 3:
-            return pd.Series(True, index=series.index)
-        median = valid.median()
-        mad = (valid - median).abs().median()
-        if mad > 0:
-            z = 0.6745 * (series - median) / mad
-            return (z.abs() <= z_thresh) | series.isna()
-        q1 = valid.quantile(0.25)
-        q3 = valid.quantile(0.75)
-        iqr = q3 - q1
-        lower = q1 - iqr_mult * iqr
-        upper = q3 + iqr_mult * iqr
-        return series.between(lower, upper) | series.isna()
+    if group_col:
+        groups = filtered[group_col]
+        median = numeric.groupby(groups).transform("median")
+        mad = (numeric - median).abs().groupby(groups).transform("median")
+        q1 = numeric.groupby(groups).transform("quantile", 0.25)
+        q3 = numeric.groupby(groups).transform("quantile", 0.75)
+    else:
+        median = numeric.median()
+        mad = (numeric - median).abs().median()
+        q1 = numeric.quantile(0.25)
+        q3 = numeric.quantile(0.75)
 
-    masks = []
-    for col in cols:
-        if col not in filtered.columns:
-            continue
-        series = coerce_numeric(filtered[col])
-        if group_col:
-            mask = filtered.groupby(group_col)[col].transform(lambda s: _mask(s))
-        else:
-            mask = _mask(series)
-        masks.append(mask)
+    z = 0.6745 * (numeric - median) / mad.replace(0, pd.NA)
+    z_mask = z.abs().le(z_thresh)
 
-    if masks:
-        combined = pd.concat(masks, axis=1).all(axis=1)
-        filtered = filtered.loc[combined]
+    iqr = q3 - q1
+    lower = q1 - iqr_mult * iqr
+    upper = q3 + iqr_mult * iqr
+    iqr_mask = (numeric >= lower) & (numeric <= upper)
 
-    return filtered
+    mask = z_mask | mad.eq(0) & iqr_mask | numeric.isna()
+    return filtered[mask.all(axis=1)]
 
 
 def derive_offline_distance(df: pd.DataFrame) -> pd.DataFrame:

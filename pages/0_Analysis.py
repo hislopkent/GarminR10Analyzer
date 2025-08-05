@@ -6,6 +6,7 @@ import streamlit as st
 
 from utils.logger import logger
 from utils.data_utils import coerce_numeric, remove_outliers, classify_shots
+from utils.constants import COLUMN_NORMALIZATION_MAP
 from utils.page_utils import require_data
 from utils.responsive import configure_page
 
@@ -19,25 +20,9 @@ raw_df = require_data().copy()
 
 @st.cache_data
 def _standardize(df: pd.DataFrame) -> pd.DataFrame:
-    col_map = {
-        "Session Name": "session_name",
-        "Club": "club",
-        "Club Type": "club",
-        "Carry Distance": "carry_distance",
-        "Carry": "carry_distance",
-        "Total Distance": "total_distance",
-        "Ball Speed": "ball_speed",
-        "Launch Angle": "launch_angle",
-        "Backspin": "spin_rate",
-        "Spin Rate": "spin_rate",
-        "Apex Height": "apex_height",
-        "Apex": "apex_height",
-        "Side": "side_distance",
-        "Side Distance": "side_distance",
-        "Offline Distance": "offline_distance",
-        "Offline": "offline_distance",
-    }
-    df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+    df = df.rename(
+        columns={k: v for k, v in COLUMN_NORMALIZATION_MAP.items() if k in df.columns}
+    )
     df = df.loc[:, ~df.columns.duplicated()]
     if "offline_distance" not in df.columns and "side_distance" in df.columns:
         df["offline_distance"] = df["side_distance"]

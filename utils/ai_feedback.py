@@ -1,11 +1,10 @@
 """Helpers for generating natural language feedback via OpenAI APIs."""
 
-import os
-import openai
 from typing import Dict
 
 import pandas as pd
 from .data_utils import coerce_numeric
+from .openai_utils import get_openai_client
 
 
 def generate_ai_summary(club_name, df):
@@ -51,36 +50,16 @@ You're a golf performance coach trained in Jon Sherman's Four Foundations. I use
 Explain what this means for my consistency and what to do in practice. Be specific and encouraging. Mention if anything is a standout or weak point.
 """
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    assistant_id = os.getenv("OPENAI_ASSISTANT_ID")
-    client = openai.OpenAI(api_key=api_key) if api_key else None
-
-    if not client or not assistant_id:
+    client = get_openai_client()
+    if client is None:
         return "⚠️ AI credentials missing."
     try:
-        thread = client.beta.threads.create()
-        client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=prompt,
+        response = client.chat.completions.create(
+            model="gpt-4o", messages=[{"role": "user", "content": prompt}], temperature=0.7
         )
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant_id,
-        )
-        import time
-        timeout = time.time() + 30  # seconds
-        while run.status not in ["completed", "failed", "cancelled", "expired"]:
-            if time.time() > timeout:
-                return "⚠️ AI summary error: timeout"
-            time.sleep(1)
-            run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
-        if run.status == "completed":
-            messages = client.beta.threads.messages.list(thread_id=thread.id)
-            return messages.data[0].content[0].text.value
-        return f"⚠️ AI summary error: {run.status}"
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        return f"⚠️ AI summary error: {str(e)}"
+        return f"⚠️ AI summary error: {e}"
 
 
 def generate_ai_batch_summaries(df) -> Dict[str, str]:
@@ -107,11 +86,8 @@ def generate_ai_batch_summaries(df) -> Dict[str, str]:
 
     summaries = {club: "" for club in clubs}
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    assistant_id = os.getenv("OPENAI_ASSISTANT_ID")
-    client = openai.OpenAI(api_key=api_key) if api_key else None
-
-    if not client or not assistant_id:
+    client = get_openai_client()
+    if client is None:
         return {club: "⚠️ AI credentials missing." for club in clubs}
 
     # Build a combined prompt with statistics for each club
@@ -154,30 +130,12 @@ def generate_ai_batch_summaries(df) -> Dict[str, str]:
     )
 
     try:
-        thread = client.beta.threads.create()
-        client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=prompt,
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
         )
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant_id,
-        )
-        import time
-        timeout = time.time() + 30  # seconds
-        while run.status not in ["completed", "failed", "cancelled", "expired"]:
-            if time.time() > timeout:
-                return {club: "⚠️ AI summary error: timeout" for club in clubs}
-            time.sleep(1)
-            run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
-
-        if run.status != "completed":
-            return {club: f"⚠️ AI summary error: {run.status}" for club in clubs}
-
-        messages = client.beta.threads.messages.list(thread_id=thread.id)
-        text = messages.data[0].content[0].text.value
-
+        text = response.choices[0].message.content
         current = None
         for line in text.splitlines():
             stripped = line.strip()
@@ -199,4 +157,4 @@ def generate_ai_batch_summaries(df) -> Dict[str, str]:
         return {club: (msg.strip() if msg else "⚠️ AI summary error") for club, msg in summaries.items()}
 
     except Exception as e:
-        return {club: f"⚠️ AI summary error: {str(e)}" for club in clubs}
+        return {club: f"⚠️ AI summary error: {e}" for club in clubs}
