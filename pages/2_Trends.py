@@ -32,9 +32,14 @@ if df.empty:
     st.info("No data available after filtering.")
     st.stop()
 
-summary = (
-    df.groupby(["Session Name", "Club"])["Carry Distance"].mean().reset_index()
-)
+metric_options = [
+    col
+    for col in ["Carry Distance", "Ball Speed", "Spin Rate"]
+    if col in df.columns
+]
+metric = st.selectbox("Metric", metric_options, index=0)
+
+summary = df.groupby(["Session Name", "Club"])[metric].mean().reset_index()
 
 club_options = sorted(summary["Club"].dropna().unique())
 if not club_options:
@@ -58,20 +63,22 @@ if "Date" in df.columns:
 fig = px.line(
     club_df,
     x="Session Name",
-    y="Carry Distance",
+    y=metric,
     markers=True,
-    title=f"Average Carry Trend – {selected_club}",
+    title=f"Average {metric} Trend – {selected_club}",
 )
+baseline = df[df["Club"] == selected_club][metric].mean()
+fig.add_hline(y=baseline, line_dash="dash", annotation_text="Overall avg")
 st.plotly_chart(fig, use_container_width=True)
 
 window = st.slider("Rolling window", 1, 5, 3)
 if len(club_df) >= window:
-    club_df["Rolling"] = club_df["Carry Distance"].rolling(window).mean()
+    club_df["Rolling"] = club_df[metric].rolling(window).mean()
     fig_roll = px.line(
         club_df,
         x="Session Name",
         y="Rolling",
         markers=True,
-        title=f"{selected_club} {window}-session rolling average",
+        title=f"{selected_club} {window}-session rolling average of {metric}",
     )
     st.plotly_chart(fig_roll, use_container_width=True)

@@ -49,44 +49,8 @@ def _standardize(df: pd.DataFrame) -> pd.DataFrame:
 
 
 df = _standardize(raw_df)
+df_filtered = df.copy()
 session_names = df["session_name"].dropna().unique().tolist()
-session_option = st.selectbox(
-    "Choose sessions to analyze",
-    ["All Sessions", "Latest Session", "Last 5 Sessions", "Select Sessions"],
-)
-
-if session_option == "All Sessions":
-    df_filtered = df
-elif session_option == "Latest Session":
-    if "Date" in df.columns and df["Date"].notna().any():
-        latest_session = df.loc[df["Date"].idxmax(), "session_name"]
-    else:
-        latest_session = session_names[-1] if session_names else None
-    df_filtered = df[df["session_name"] == latest_session] if latest_session else df.iloc[0:0]
-elif session_option == "Last 5 Sessions":
-    if "Date" in df.columns and df["Date"].notna().any():
-        session_order = (
-            df.drop_duplicates("session_name").sort_values("Date")
-        )["session_name"].tolist()
-    else:
-        session_order = session_names
-    last_sessions = session_order[-5:]
-    df_filtered = df[df["session_name"].isin(last_sessions)]
-else:  # Select Sessions
-    chosen = st.multiselect("Select session(s)", session_names)
-    df_filtered = (
-        df[df["session_name"].isin(chosen)] if chosen else df.iloc[0:0]
-    )
-
-exclude = st.session_state.get("exclude_sessions", [])
-if exclude:
-    df_filtered = df_filtered[~df_filtered["session_name"].isin(exclude)]
-
-filter_outliers = st.checkbox(
-    "Remove outliers",
-    value=True,
-    help="Drop shots with extreme values so a few wild swings don't skew averages",
-)
 
 
 @st.cache_data
@@ -96,55 +60,105 @@ def _apply_outlier_filter(
     return remove_outliers(df, list(cols), z_thresh=z, method=method)
 
 
-if filter_outliers:
-    numeric_cols = (
-        "carry_distance",
-        "total_distance",
-        "ball_speed",
-        "launch_angle",
-        "spin_rate",
-        "apex_height",
-        "side_distance",
-        "offline_distance",
+with st.expander("Advanced Filters", expanded=False):
+    session_option = st.selectbox(
+        "Choose sessions to analyze",
+        ["All Sessions", "Latest Session", "Last 5 Sessions", "Select Sessions"],
     )
-    cols_present = [c for c in numeric_cols if c in df_filtered.columns]
-    col_sel = st.multiselect(
-        "Outlier metrics", cols_present, default=cols_present
-    )
-    method_choice = st.radio(
-        "Outlier detection",
-        ["Statistical", "Adaptive"],
-        help="Statistical uses z-scores/IQR; Adaptive uses Isolation Forest",
-    )
-    method = "isolation" if method_choice == "Adaptive" else "mad"
-    if method == "isolation" and IsolationForest is None:
-        st.warning("scikit-learn required for adaptive method; using statistical instead")
-        method = "mad"
-    if method == "mad":
-        z_thresh = st.slider("Z-score threshold", 1.0, 5.0, 3.0)
-    else:
-        z_thresh = 3.0
-    if col_sel:
-        df_filtered = _apply_outlier_filter(
-            df_filtered, tuple(col_sel), z_thresh, method
+
+    if session_option == "All Sessions":
+        df_filtered = df
+    elif session_option == "Latest Session":
+        if "Date" in df.columns and df["Date"].notna().any():
+            latest_session = df.loc[df["Date"].idxmax(), "session_name"]
+        else:
+            latest_session = session_names[-1] if session_names else None
+        df_filtered = (
+            df[df["session_name"] == latest_session]
+            if latest_session
+            else df.iloc[0:0]
+        )
+    elif session_option == "Last 5 Sessions":
+        if "Date" in df.columns and df["Date"].notna().any():
+            session_order = (
+                df.drop_duplicates("session_name").sort_values("Date")
+            )["session_name"].tolist()
+        else:
+            session_order = session_names
+        last_sessions = session_order[-5:]
+        df_filtered = df[df["session_name"].isin(last_sessions)]
+    else:  # Select Sessions
+        chosen = st.multiselect("Select session(s)", session_names)
+        df_filtered = (
+            df[df["session_name"].isin(chosen)] if chosen else df.iloc[0:0]
         )
 
-df_filtered = classify_shots(
-    df_filtered, carry_col="carry_distance", offline_col="offline_distance"
-)
-if "shot_tags" in st.session_state:
-    tag_map = st.session_state["shot_tags"]
-    df_filtered.loc[
-        df_filtered.index.intersection(tag_map.keys()), "Quality"
-    ] = df_filtered.index.map(tag_map)
+    exclude = st.multiselect(
+        "Exclude sessions from analysis",
+        session_names,
+        st.session_state.get("exclude_sessions", []),
+    )
+    st.session_state["exclude_sessions"] = exclude
+    if exclude:
+        df_filtered = df_filtered[~df_filtered["session_name"].isin(exclude)]
 
-use_quality = st.checkbox(
-    "Include only 'good' shots",
-    value=False,
-    help="Keep shots labelled as 'good' and ignore ones tagged 'miss' or 'outlier'",
-)
-if use_quality and "Quality" in df_filtered.columns:
-    df_filtered = df_filtered[df_filtered["Quality"] == "good"]
+    filter_outliers = st.checkbox(
+        "Remove outliers",
+        value=True,
+        help="Drop shots with extreme values so a few wild swings don't skew averages",
+    )
+
+    if filter_outliers:
+        numeric_cols = (
+            "carry_distance",
+            "total_distance",
+            "ball_speed",
+            "launch_angle",
+            "spin_rate",
+            "apex_height",
+            "side_distance",
+            "offline_distance",
+        )
+        cols_present = [c for c in numeric_cols if c in df_filtered.columns]
+        col_sel = st.multiselect(
+            "Outlier metrics", cols_present, default=cols_present
+        )
+        method_choice = st.radio(
+            "Outlier detection",
+            ["Statistical", "Adaptive"],
+            help="Statistical uses z-scores/IQR; Adaptive uses Isolation Forest",
+        )
+        method = "isolation" if method_choice == "Adaptive" else "mad"
+        if method == "isolation" and IsolationForest is None:
+            st.warning(
+                "scikit-learn required for adaptive method; using statistical instead"
+            )
+            method = "mad"
+        if method == "mad":
+            z_thresh = st.slider("Z-score threshold", 1.0, 5.0, 3.0)
+        else:
+            z_thresh = 3.0
+        if col_sel:
+            df_filtered = _apply_outlier_filter(
+                df_filtered, tuple(col_sel), z_thresh, method
+            )
+
+    df_filtered = classify_shots(
+        df_filtered, carry_col="carry_distance", offline_col="offline_distance"
+    )
+    if "shot_tags" in st.session_state:
+        tag_map = st.session_state["shot_tags"]
+        df_filtered.loc[
+            df_filtered.index.intersection(tag_map.keys()), "Quality"
+        ] = df_filtered.index.map(tag_map)
+
+    use_quality = st.checkbox(
+        "Include only 'good' shots",
+        value=False,
+        help="Keep shots labelled as 'good' and ignore ones tagged 'miss' or 'outlier'",
+    )
+    if use_quality and "Quality" in df_filtered.columns:
+        df_filtered = df_filtered[df_filtered["Quality"] == "good"]
 
 overview_tab, benchmark_tab = st.tabs(["Overview", "Benchmarking"])
 
@@ -204,14 +218,13 @@ with overview_tab:
     st.markdown("## 📊 Coach’s Notes")
     for _, row in club_summary.iterrows():
         if row["std_carry"] > 15:
-            st.write(
-                f"🟡 Your **{row['club']}** has a high carry distance variance ({row['std_carry']:.1f} yds). "
-                "Consider strike pattern drills or better clubface control."
+            st.warning(
+                f"**{row['club']}** carry varies {row['std_carry']:.1f} yds. "
+                f"Try a [tempo drill](https://www.golfdigest.com/story/golf-tempo-drills) to tighten dispersion."
             )
         if row["avg_carry"] < 100 and "wedge" in str(row["club"]).lower():
-            st.write(
-                f"⚠️ Your **{row['club']}** carry is lower than expected. "
-                "Check contact quality and ball-first strike."
+            st.info(
+                f"**{row['club']}** carry seems low. Work on [ball-first contact](https://www.golf.com/instruction/solid-contact-drill)."
             )
 
     for club in club_summary["club"]:
@@ -354,14 +367,16 @@ with benchmark_tab:
 
     if pd.notna(carry_std) and carry_std > 15:
         st.warning(
-            "⚠️ High inconsistency in carry distance – consider working on strike location and tempo control."
+            "⚠️ High inconsistency in carry distance – consider working on strike location and tempo control. "
+            "Try the [three-ball ladder drill](https://practical-golf.com/three-ball-ladder-drill)."
         )
     else:
         st.success("✅ Carry distance shows good consistency.")
     if offline_std is not None:
         if pd.notna(offline_std) and offline_std > 10:
             st.warning(
-                "⚠️ Offline dispersion is wide – work on face angle or path to tighten dispersion."
+                "⚠️ Offline dispersion is wide – work on face angle or path to tighten dispersion. "
+                "[Gate drills](https://www.golfdigest.com/story/gate-drill) can help."
             )
         else:
             st.success("✅ Directional control appears solid.")

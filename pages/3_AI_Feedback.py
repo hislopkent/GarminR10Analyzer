@@ -6,6 +6,7 @@ from utils.logger import logger
 from utils.data_utils import coerce_numeric
 from utils.ai_feedback import generate_ai_summary
 from utils.practice_ai import analyze_practice_session
+from utils.drill_recommendations import recommend_drills
 from utils.page_utils import require_data
 from utils.responsive import configure_page
 
@@ -27,13 +28,12 @@ for col in [
         df[col] = coerce_numeric(df[col])
 
 uploaded_files = st.session_state.get("uploaded_files", [])
-if (
-    "ai_files_snapshot" in st.session_state
-    and set(st.session_state["ai_files_snapshot"]) != set(uploaded_files)
-):
-    st.warning(
-        "⚠️ New CSV files detected since last AI run. Regenerate to include them."
-    )
+if set(st.session_state.get("ai_files_snapshot", [])) != set(uploaded_files):
+    st.info("📥 New session files detected. Updating summaries...")
+    st.session_state["practice_summary"] = analyze_practice_session(df)
+    st.session_state["ai_files_snapshot"] = uploaded_files
+
+drill_map = recommend_drills(df.rename(columns={"Club": "Club Type"}))
 
 insight_tab, session_tab = st.tabs(["Club Insight", "Practice Summary"])
 
@@ -56,6 +56,11 @@ with insight_tab:
         if cached:
             st.markdown("### 💬 Summary")
             st.write(cached)
+            drills = drill_map.get(selected_club, [])
+            if drills:
+                st.markdown("### 🏌️‍♂️ Recommended Drills")
+                for rec in drills:
+                    st.write(f"- {rec.drill}")
 
 with session_tab:
     if st.button("Generate Practice Summary"):
@@ -72,4 +77,9 @@ with session_tab:
             st.markdown("**Detected Issues:**")
             for issue in entry["issues"]:
                 st.write(f"- {issue}")
+        drills = drill_map.get(entry["club"], [])
+        if drills:
+            st.markdown("**Recommended Drills:**")
+            for rec in drills:
+                st.write(f"- {rec.drill}")
         st.markdown("---")
