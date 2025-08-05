@@ -7,6 +7,7 @@ cached on disk so the user can navigate between pages without losing data.
 
 import json
 import os
+from threading import Timer
 
 import pandas as pd
 import streamlit as st
@@ -20,33 +21,44 @@ st.title("📊 Garmin R10 Analyzer")
 
 CACHE_PATH = os.path.join("sample_data", "session_cache.json")
 
+_persist_timer: Timer | None = None
 
-def persist_state() -> None:
-    """Persist uploaded file names and dataframe to disk.
 
-    Streamlit's session state is volatile when the app reloads.  To make the
-    experience smoother, the list of uploaded files and the combined dataframe
-    are serialized to ``CACHE_PATH``.  The cache is lightweight and can be
-    safely deleted if it becomes corrupted.
+def persist_state(delay: float = 0.5) -> None:
+    """Persist uploaded file names and dataframe to disk with debouncing.
+
+    Previously the cache file was rewritten on every upload or removal which
+    caused unnecessary disk I/O.  This implementation batches rapid successive
+    calls by delaying the actual write slightly and cancelling any pending
+    writes if a new request arrives within the ``delay`` window.
     """
 
     data = {
         "files": st.session_state.get("uploaded_files", []),
         "df": st.session_state.get("session_df", pd.DataFrame()),
     }
-    try:
-        os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
-        with open(CACHE_PATH, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "files": data["files"],
-                    "df": data["df"].to_json(orient="split"),
-                },
-                f,
-            )
-        logger.info("State persisted with %d file(s)", len(data["files"]))
-    except (OSError, TypeError, ValueError) as exc:  # pragma: no cover
-        logger.warning("Failed to persist state: %s", exc)
+
+    def _write() -> None:
+        try:
+            os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
+            with open(CACHE_PATH, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "files": data["files"],
+                        "df": data["df"].to_json(orient="split"),
+                    },
+                    f,
+                )
+            logger.info("State persisted with %d file(s)", len(data["files"]))
+        except (OSError, TypeError, ValueError) as exc:  # pragma: no cover
+            logger.warning("Failed to persist state: %s", exc)
+
+    global _persist_timer
+    if _persist_timer and _persist_timer.is_alive():
+        _persist_timer.cancel()
+    _persist_timer = Timer(delay, _write)
+    _persist_timer.daemon = True
+    _persist_timer.start()
 
 
 def _refresh_session_views() -> None:

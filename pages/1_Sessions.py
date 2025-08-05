@@ -58,7 +58,24 @@ with viewer_tab:
 
     df_view = classify_shots(df_view)
     df_view = df_view.reset_index().rename(columns={"index": "_idx"})
-    edited = st.data_editor(df_view, hide_index=True, key="tag_editor")
+
+    bulk_tag = st.selectbox(
+        "Bulk set quality for all visible shots",
+        ["", "good", "miss", "outlier"],
+    )
+    if st.button("Apply tag") and bulk_tag:
+        df_view["Quality"] = bulk_tag
+
+    edited = st.data_editor(
+        df_view,
+        hide_index=True,
+        key="tag_editor",
+        column_config={
+            "Quality": st.column_config.SelectboxColumn(
+                "Quality", options=["good", "miss", "outlier"], default="good"
+            )
+        },
+    )
     if "shot_tags" not in st.session_state:
         st.session_state["shot_tags"] = {}
     for _, row in edited.iterrows():

@@ -2,6 +2,7 @@
 
 from typing import List
 
+from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 
 from .data_utils import derive_offline_distance
@@ -23,34 +24,35 @@ def load_sessions(files: List[object]) -> pd.DataFrame:
     ``app.log``.
     """
 
-    sessions = []
-    for file in files:
+    def _load(file: object):
         try:
             if hasattr(file, "seek"):
                 file.seek(0)
             df = pd.read_csv(
                 file, encoding="utf-8", encoding_errors="replace", on_bad_lines="error"
             )
-            # Normalise club column name
             if "Club" not in df.columns and "Club Type" in df.columns:
                 df["Club"] = df["Club Type"]
             df = derive_offline_distance(df)
 
-            # Parse dates to determine session naming
             first_dt = pd.NaT
             if "Date" in df.columns:
                 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
                 first_dt = df["Date"].min()
 
-            sessions.append({
+            return {
                 "df": df,
                 "first_dt": first_dt,
                 "file_name": getattr(file, "name", "Unknown"),
-            })
+            }
         except (OSError, pd.errors.ParserError, UnicodeError, AttributeError) as e:
             logger.warning(
                 "Failed to load %s: %s", getattr(file, "name", "unknown"), e
             )
+            return None
+
+    with ThreadPoolExecutor() as pool:
+        sessions = [s for s in pool.map(_load, files) if s]
 
     if not sessions:
         return pd.DataFrame()
