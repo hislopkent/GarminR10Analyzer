@@ -86,6 +86,18 @@ with viewer_tab:
 
         if edited.empty:
             st.info("No sessions selected.")
+        else:
+            total_shots = len(edited)
+            good_pct = (edited["Quality"] == "good").mean() * 100
+            cols = st.columns(3)
+            cols[0].metric("Shots", total_shots)
+            cols[1].metric("Good %", f"{good_pct:.0f}%")
+            if "Carry Distance" in edited.columns:
+                cols[2].metric(
+                    "Avg Carry", f"{edited['Carry Distance'].mean():.1f} yds"
+                )
+            quality_counts = edited["Quality"].value_counts()
+            st.bar_chart(quality_counts)
 
 with log_tab:
     st.subheader("Practice Log")
@@ -110,6 +122,11 @@ with log_tab:
         st.markdown("### 📅 Your Practice History")
         df_log = pd.DataFrame(st.session_state.practice_log)
         st.dataframe(df_log, use_container_width=True)
+        focus_counts = df_log["Focus"].value_counts()
+        st.bar_chart(focus_counts)
+        df_log["Date"] = pd.to_datetime(df_log["Date"])
+        trend = df_log.groupby("Date").size()
+        st.line_chart(trend)
         csv = df_log.to_csv(index=False).encode("utf-8")
         st.download_button(
             "📥 Download Log as CSV",
