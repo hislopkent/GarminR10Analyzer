@@ -2,6 +2,11 @@
 
 import pandas as pd
 
+try:  # scikit-learn is optional
+    from sklearn.ensemble import IsolationForest
+except Exception:  # pragma: no cover - handled at runtime
+    IsolationForest = None
+
 
 def coerce_numeric(series, errors: str = "coerce"):
     """Return numeric values for ``series`` even if duplicates exist.
@@ -24,6 +29,7 @@ def remove_outliers(
     *,
     z_thresh: float = 3.0,
     iqr_mult: float = 1.5,
+    method: str = "mad",
 ) -> pd.DataFrame:
     """Return ``df`` with outliers removed for the given ``cols``.
 
@@ -39,6 +45,10 @@ def remove_outliers(
     iqr_mult:
         Multiplier for the IQR fallback when MAD is zero.  A value of ``1.5``
         matches the conventional IQR rule.
+    method:
+        Outlier detection approach. ``"mad"`` applies a robust z-score rule
+        with an IQR fallback. ``"isolation"`` uses an Isolation Forest for
+        adaptive, multivariate detection.
 
     When a club column (``club`` or ``Club``) is present the outlier rule is
     evaluated within each club.  Rows falling outside the acceptable range for
@@ -54,6 +64,26 @@ def remove_outliers(
     numeric = filtered[cols].apply(coerce_numeric)
     group_col = next((c for c in ("club", "Club") if c in filtered.columns), None)
 
+    if method == "isolation":
+        if IsolationForest is None:
+            raise ImportError("scikit-learn is required for adaptive outlier detection")
+        mask = pd.Series(True, index=filtered.index)
+        if group_col:
+            for _, idx in numeric.groupby(filtered[group_col]).groups.items():
+                subset = numeric.loc[idx]
+                if len(subset) < 2:
+                    continue
+                model = IsolationForest(contamination="auto", random_state=0)
+                preds = model.fit_predict(subset)
+                mask.loc[idx] = preds == 1
+        else:
+            if len(numeric) >= 2:
+                model = IsolationForest(contamination="auto", random_state=0)
+                preds = model.fit_predict(numeric)
+                mask = preds == 1
+        return filtered[mask]
+
+    # default: robust z-score with IQR fallback
     if group_col:
         groups = filtered[group_col]
 
