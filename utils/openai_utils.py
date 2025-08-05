@@ -5,6 +5,8 @@ import os
 
 from openai import OpenAI
 
+from .logger import logger
+
 
 @lru_cache(maxsize=1)
 def get_openai_client() -> OpenAI | None:
@@ -19,8 +21,10 @@ def get_openai_client() -> OpenAI | None:
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
+        logger.warning("OPENAI_API_KEY not set; OpenAI features disabled")
         return None
     try:
         return OpenAI(api_key=api_key)
-    except Exception:
+    except Exception as exc:  # pragma: no cover - network failures
+        logger.error("Failed to create OpenAI client: %s", exc)
         return None

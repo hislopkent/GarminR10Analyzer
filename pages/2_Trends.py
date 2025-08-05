@@ -37,6 +37,9 @@ summary = (
 )
 
 club_options = sorted(summary["Club"].dropna().unique())
+if not club_options:
+    st.info("No club data available.")
+    st.stop()
 selected_club = st.selectbox("Select club", club_options)
 club_df = summary[summary["Club"] == selected_club].copy()
 
