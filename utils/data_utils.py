@@ -56,10 +56,33 @@ def remove_outliers(
 
     if group_col:
         groups = filtered[group_col]
-        median = numeric.groupby(groups).transform("median")
-        mad = (numeric - median).abs().groupby(groups).transform("median")
-        q1 = numeric.groupby(groups).transform("quantile", 0.25)
-        q3 = numeric.groupby(groups).transform("quantile", 0.75)
+
+        def _mad(x: pd.Series) -> float:
+            return (x - x.median()).abs().median()
+
+        _mad.__name__ = "mad"  # naming for groupby.agg
+
+        def _q1(x: pd.Series) -> float:
+            return x.quantile(0.25)
+
+        _q1.__name__ = "q1"
+
+        def _q3(x: pd.Series) -> float:
+            return x.quantile(0.75)
+
+        _q3.__name__ = "q3"
+
+        stats = numeric.groupby(groups).agg(["median", _mad, _q1, _q3])
+        stats.columns = [f"{col}_{stat}" for col, stat in stats.columns]
+        stats = stats.reindex(groups).set_index(filtered.index)
+        median = stats[[f"{c}_median" for c in cols]]
+        median.columns = cols
+        mad = stats[[f"{c}_mad" for c in cols]]
+        mad.columns = cols
+        q1 = stats[[f"{c}_q1" for c in cols]]
+        q1.columns = cols
+        q3 = stats[[f"{c}_q3" for c in cols]]
+        q3.columns = cols
     else:
         median = numeric.median()
         mad = (numeric - median).abs().median()
@@ -74,7 +97,7 @@ def remove_outliers(
     upper = q3 + iqr_mult * iqr
     iqr_mask = (numeric >= lower) & (numeric <= upper)
 
-    mask = z_mask | mad.eq(0) & iqr_mask | numeric.isna()
+    mask = z_mask | (mad.eq(0) & iqr_mask) | numeric.isna()
     return filtered[mask.all(axis=1)]
 
 
@@ -115,30 +138,29 @@ def classify_shots(
     """
 
     df = df.copy()
+    df["Quality"] = "good"
+
+    median = mad = None
     if carry_col in df.columns:
         df[carry_col] = coerce_numeric(df[carry_col])
         median = df[carry_col].median()
         mad = (df[carry_col] - median).abs().median()
-    else:
-        median = mad = None
+
+    offline_abs = None
     if offline_col in df.columns:
         df[offline_col] = coerce_numeric(df[offline_col])
+        offline_abs = df[offline_col].abs()
+        df.loc[offline_abs > 15, "Quality"] = "outlier"
 
-    def _label(row: pd.Series) -> str:
-        carry = row.get(carry_col)
-        offline = row.get(offline_col)
-        if pd.notna(offline) and abs(offline) > 15:
-            return "outlier"
-        if median is not None and pd.notna(carry):
-            if mad and mad > 0:
-                z = 0.6745 * (carry - median) / mad
-                if abs(z) > 3:
-                    return "outlier"
-            if abs(carry - median) > 10 or (
-                pd.notna(offline) and abs(offline) > 7
-            ):
-                return "miss"
-        return "good"
+    if carry_col in df.columns and mad is not None and mad > 0:
+        z = 0.6745 * (df[carry_col] - median) / mad
+        df.loc[z.abs() > 3, "Quality"] = "outlier"
 
-    df["Quality"] = df.apply(_label, axis=1)
+    miss_mask = pd.Series(False, index=df.index)
+    if carry_col in df.columns:
+        miss_mask |= (df[carry_col] - median).abs() > 10
+    if offline_abs is not None:
+        miss_mask |= offline_abs > 7
+
+    df.loc[miss_mask & df["Quality"].eq("good"), "Quality"] = "miss"
     return df

@@ -1,11 +1,21 @@
 """Shared helpers for working with the OpenAI API."""
 
+from functools import lru_cache
 import os
+
 from openai import OpenAI
 
 
+@lru_cache(maxsize=1)
 def get_openai_client() -> OpenAI | None:
-    """Return an OpenAI client if an API key is available."""
+    """Return a cached OpenAI client if an API key is available.
+
+    Creating an ``OpenAI`` client triggers network lookups and environment
+    validation.  The original implementation instantiated a new client on every
+    call which could add noticeable latency when multiple helpers relied on this
+    function.  The result is now cached so subsequent calls reuse the same
+    client instance.
+    """
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
