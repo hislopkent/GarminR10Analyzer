@@ -39,20 +39,23 @@ insight_tab, session_tab = st.tabs(["Club Insight", "Practice Summary"])
 
 with insight_tab:
     club_list = sorted(df["Club"].dropna().unique())
-    selected_club = st.selectbox("Select a club for feedback", club_list)
-    if st.button("Generate Summary"):
-        with st.spinner("Generating AI summary..."):
-            sampled = df[df["Club"] == selected_club].sample(
-                n=min(25, len(df[df["Club"] == selected_club])), random_state=42
-            )
-            feedback = generate_ai_summary(selected_club, sampled)
-            st.session_state[f"ai_{selected_club}"] = feedback
-            st.session_state["ai_files_snapshot"] = uploaded_files
-            st.success("✅ Summary generated!")
-    cached = st.session_state.get(f"ai_{selected_club}")
-    if cached:
-        st.markdown("### 💬 Summary")
-        st.write(cached)
+    if not club_list:
+        st.info("No club data available.")
+    else:
+        selected_club = st.selectbox("Select a club for feedback", club_list)
+        if st.button("Generate Summary"):
+            with st.spinner("Generating AI summary..."):
+                sampled = df[df["Club"] == selected_club].sample(
+                    n=min(25, len(df[df["Club"] == selected_club])), random_state=42
+                )
+                feedback = generate_ai_summary(selected_club, sampled)
+                st.session_state[f"ai_{selected_club}"] = feedback
+                st.session_state["ai_files_snapshot"] = uploaded_files
+                st.success("✅ Summary generated!")
+        cached = st.session_state.get(f"ai_{selected_club}")
+        if cached:
+            st.markdown("### 💬 Summary")
+            st.write(cached)
 
 with session_tab:
     if st.button("Generate Practice Summary"):

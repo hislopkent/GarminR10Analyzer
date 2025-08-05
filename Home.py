@@ -5,6 +5,7 @@ between reloads. Uploaded CSV files are combined into a single dataframe and
 cached on disk so the user can navigate between pages without losing data.
 """
 
+import atexit
 import json
 import os
 from threading import Timer
@@ -22,6 +23,17 @@ st.title("📊 Garmin R10 Analyzer")
 CACHE_PATH = os.path.join("sample_data", "session_cache.json")
 
 _persist_timer: Timer | None = None
+
+
+def _cancel_timer() -> None:
+    """Cancel any pending persistence timer on app shutdown."""
+
+    global _persist_timer
+    if _persist_timer and _persist_timer.is_alive():
+        _persist_timer.cancel()
+
+
+atexit.register(_cancel_timer)
 
 
 def persist_state(delay: float = 0.5) -> None:
