@@ -2,22 +2,9 @@
 
 import pandas as pd
 import numpy as np
-from openai import OpenAI
-import os
 from .data_utils import coerce_numeric, remove_outliers
 from .benchmarks import get_benchmarks
-
-
-def _get_client() -> OpenAI | None:
-    """Return an OpenAI client if an API key is configured."""
-
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return None
-    try:
-        return OpenAI(api_key=api_key)
-    except Exception:
-        return None
+from .openai_utils import get_openai_client
 
 
 def analyze_club_stats(
@@ -57,18 +44,32 @@ def analyze_club_stats(
     if len(club_df) < 6:
         return None
 
-    avg_smash = club_df["Smash Factor"].mean() if "Smash Factor" in club_df else np.nan
-    avg_launch = club_df["Launch Angle"].mean() if "Launch Angle" in club_df else np.nan
-    avg_spin = club_df["Spin Rate"].mean() if "Spin Rate" in club_df else np.nan
-    avg_carry = club_df["Carry Distance"].mean() if "Carry Distance" in club_df else np.nan
-    avg_offline = club_df["Offline"].mean() if "Offline" in club_df else np.nan
-    std_carry = club_df["Carry Distance"].std() if "Carry Distance" in club_df else np.nan
-    left_bias = (
-        (club_df["Offline"] < 0).mean() * 100 if "Offline" in club_df else 0
-    )
-    right_bias = (
-        (club_df["Offline"] > 0).mean() * 100 if "Offline" in club_df else 0
-    )
+    def _left_bias(x):
+        return (x < 0).mean() * 100
+
+    def _right_bias(x):
+        return (x > 0).mean() * 100
+
+    _left_bias.__name__ = "left_bias"
+    _right_bias.__name__ = "right_bias"
+
+    agg_map = {
+        "Smash Factor": "mean",
+        "Launch Angle": "mean",
+        "Spin Rate": "mean",
+        "Carry Distance": ["mean", "std"],
+        "Offline": ["mean", _left_bias, _right_bias],
+    }
+    agg_map = {k: v for k, v in agg_map.items() if k in club_df.columns}
+    stats = club_df.agg(agg_map) if agg_map else pd.DataFrame()
+    avg_smash = stats.at["mean", "Smash Factor"] if "Smash Factor" in stats.columns else np.nan
+    avg_launch = stats.at["mean", "Launch Angle"] if "Launch Angle" in stats.columns else np.nan
+    avg_spin = stats.at["mean", "Spin Rate"] if "Spin Rate" in stats.columns else np.nan
+    avg_carry = stats.at["mean", "Carry Distance"] if "Carry Distance" in stats.columns else np.nan
+    std_carry = stats.at["std", "Carry Distance"] if "Carry Distance" in stats.columns else np.nan
+    avg_offline = stats.at["mean", "Offline"] if "Offline" in stats.columns else np.nan
+    left_bias = stats.at["left_bias", "Offline"] if ("Offline" in stats.columns and "left_bias" in stats.index) else 0
+    right_bias = stats.at["right_bias", "Offline"] if ("Offline" in stats.columns and "right_bias" in stats.index) else 0
 
     # Contact trends via smash factor
     if "Smash Factor" in club_df:
@@ -162,7 +163,7 @@ def summarize_with_ai(club: str, issues: list[str]) -> str:
     if not issues:
         return f"Your {club} data looks solid — no major red flags detected. Nice work!"
 
-    client = _get_client()
+    client = get_openai_client()
     if client is None:
         return "(AI summary disabled: no API key)"
 

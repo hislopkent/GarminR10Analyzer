@@ -5,8 +5,8 @@ between reloads. Uploaded CSV files are combined into a single dataframe and
 cached on disk so the user can navigate between pages without losing data.
 """
 
+import json
 import os
-import pickle
 
 import pandas as pd
 import streamlit as st
@@ -18,7 +18,7 @@ from utils.responsive import configure_page
 configure_page()
 st.title("📊 Garmin R10 Analyzer")
 
-CACHE_PATH = os.path.join("sample_data", "session_cache.pkl")
+CACHE_PATH = os.path.join("sample_data", "session_cache.json")
 
 
 def persist_state() -> None:
@@ -36,10 +36,16 @@ def persist_state() -> None:
     }
     try:
         os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
-        with open(CACHE_PATH, "wb") as f:
-            pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "files": data["files"],
+                    "df": data["df"].to_json(orient="split"),
+                },
+                f,
+            )
         logger.info("State persisted with %d file(s)", len(data["files"]))
-    except OSError as exc:  # pragma: no cover - filesystem errors are rare
+    except (OSError, TypeError, ValueError) as exc:  # pragma: no cover
         logger.warning("Failed to persist state: %s", exc)
 
 
@@ -59,13 +65,16 @@ def load_state() -> None:
 
     if os.path.exists(CACHE_PATH):
         try:
-            with open(CACHE_PATH, "rb") as f:
-                data = pickle.load(f)
-        except OSError as exc:  # pragma: no cover - rare
+            with open(CACHE_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError) as exc:  # pragma: no cover - rare
             logger.warning("Failed to load cached state: %s", exc)
             return
         st.session_state["uploaded_files"] = data.get("files", [])
-        st.session_state["session_df"] = data.get("df", pd.DataFrame())
+        df_json = data.get("df")
+        st.session_state["session_df"] = (
+            pd.read_json(df_json, orient="split") if df_json else pd.DataFrame()
+        )
         _refresh_session_views()
 
 

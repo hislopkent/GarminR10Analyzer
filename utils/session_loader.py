@@ -1,6 +1,5 @@
 """Utilities for loading and normalising Garmin session CSV files."""
 
-import io
 from typing import List
 
 import pandas as pd
@@ -27,26 +26,11 @@ def load_sessions(files: List[object]) -> pd.DataFrame:
     sessions = []
     for file in files:
         try:
-            # ``UploadedFile`` objects from Streamlit expose ``getvalue``.
-            # Fallback to ``read`` for generic file objects.  Accept both bytes
-            # and text input, attempting UTF-8 decoding first and falling back to
-            # latin-1 so unusual encodings don't immediately raise errors.
-            if hasattr(file, "getvalue"):
-                raw = file.getvalue()
-            elif hasattr(file, "read"):
-                raw = file.read()
-            else:
-                raise AttributeError("File object has no read() method")
-
-            if isinstance(raw, bytes):
-                try:
-                    content = raw.decode("utf-8")
-                except UnicodeDecodeError:
-                    content = raw.decode("latin-1")
-            else:
-                content = str(raw)
-
-            df = pd.read_csv(io.StringIO(content), on_bad_lines="skip")
+            if hasattr(file, "seek"):
+                file.seek(0)
+            df = pd.read_csv(
+                file, encoding="utf-8", encoding_errors="replace", on_bad_lines="error"
+            )
             # Normalise club column name
             if "Club" not in df.columns and "Club Type" in df.columns:
                 df["Club"] = df["Club Type"]
@@ -63,7 +47,7 @@ def load_sessions(files: List[object]) -> pd.DataFrame:
                 "first_dt": first_dt,
                 "file_name": getattr(file, "name", "Unknown"),
             })
-        except Exception as e:
+        except (OSError, pd.errors.ParserError, UnicodeError, AttributeError) as e:
             logger.warning(
                 "Failed to load %s: %s", getattr(file, "name", "unknown"), e
             )
