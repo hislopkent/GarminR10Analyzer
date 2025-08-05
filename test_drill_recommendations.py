@@ -73,3 +73,17 @@ def test_excessive_wedge_backspin():
     recs = recommend_drills(df)
     issues = [r.issue for r in recs['PW']]
     assert "Excessive wedge backspin" in issues
+
+
+def test_duplicate_club_type_columns_are_handled():
+    df = pd.DataFrame({
+        'Club Type': ['Driver', 'Driver'],
+        'Carry Distance': [230, 232],
+        'Smash Factor': [1.40, 1.46],
+        'Launch Angle': [12, 13],
+        'Club': ['Driver', 'Driver'],
+    })
+    df_dup = df.rename(columns={'Club': 'Club Type'})
+    recs = recommend_drills(df_dup)
+    issues = [r.issue for r in recs['Driver']]
+    assert "Low smash factor" in issues

@@ -33,7 +33,7 @@ if set(st.session_state.get("ai_files_snapshot", [])) != set(uploaded_files):
     st.session_state["practice_summary"] = analyze_practice_session(df)
     st.session_state["ai_files_snapshot"] = uploaded_files
 
-drill_map = recommend_drills(df.rename(columns={"Club": "Club Type"}))
+drill_map = recommend_drills(df)
 
 insight_tab, session_tab = st.tabs(["Club Insight", "Practice Summary"])
 

@@ -70,14 +70,21 @@ def recommend_drills(df: pd.DataFrame) -> Dict[str, List[Recommendation]]:
     Parameters
     ----------
     df:
-        DataFrame containing at least ``Club Type``, ``Carry Distance``,
-        ``Smash Factor`` and ``Launch Angle`` columns.
+        DataFrame containing club shot data.  A ``Club Type`` column is
+        expected, but if only ``Club`` is present it will be used instead.
 
     Returns
     -------
     dict
         Mapping of club name to a list of :class:`Recommendation` objects.
     """
+
+    df = df.copy()
+    df = df.loc[:, ~df.columns.duplicated()]
+    if "Club Type" not in df.columns and "Club" in df.columns:
+        df = df.rename(columns={"Club": "Club Type"})
+    if "Club Type" not in df.columns:
+        return {}
 
     recommendations: Dict[str, List[Recommendation]] = {}
 
