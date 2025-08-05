@@ -20,7 +20,11 @@ if "Date" in df.columns:
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
 df = classify_shots(df)
-use_quality = st.checkbox("Use only quality shots", value=True)
+use_quality = st.checkbox(
+    "Include only 'good' shots",
+    value=True,
+    help="Keep shots labelled as 'good' and ignore ones tagged 'miss' or 'outlier'",
+)
 if use_quality and "Quality" in df.columns:
     df = df[df["Quality"] == "good"]
 
