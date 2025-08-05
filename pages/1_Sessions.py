@@ -8,6 +8,7 @@ from datetime import datetime
 from utils.logger import logger
 from utils.page_utils import require_data
 from utils.responsive import configure_page
+from utils.data_utils import classify_shots
 
 logger.info("📄 Page loaded: Sessions")
 configure_page()
@@ -48,9 +49,22 @@ with viewer_tab:
         df_view = (
             df_all[df_all["Session Name"].isin(chosen)] if chosen else df_all.iloc[0:0]
         )
+    exclude_sessions = st.multiselect(
+        "Exclude sessions from analysis",
+        session_names,
+        st.session_state.get("exclude_sessions", []),
+    )
+    st.session_state["exclude_sessions"] = exclude_sessions
 
-    st.dataframe(df_view, use_container_width=True)
-    if df_view.empty:
+    df_view = classify_shots(df_view)
+    df_view = df_view.reset_index().rename(columns={"index": "_idx"})
+    edited = st.data_editor(df_view, hide_index=True, key="tag_editor")
+    if "shot_tags" not in st.session_state:
+        st.session_state["shot_tags"] = {}
+    for _, row in edited.iterrows():
+        st.session_state["shot_tags"][row["_idx"]] = row.get("Quality", "good")
+
+    if edited.empty:
         st.info("No sessions selected.")
 
 with log_tab:

@@ -15,11 +15,19 @@ A Streamlit-based app for analyzing and improving your golf performance using da
 - Benchmarking tab explores dispersion and shot-level metrics
 - Interactive Plotly charts for carry distance and dispersion
 - Smart session and club filtering
+- Adjustable outlier controls and percentile benchmarks
+- Filter analysis to "quality" shots only
 
 ### 📋 Sessions Page
-- Table viewer for raw shot data
+- Editable table viewer for raw shot data with manual shot tagging
+- Exclude whole sessions from analysis when needed
 - Built-in practice log to capture notes and drills
 - Download logs as CSV
+
+### 📉 Trends Page
+- Track carry distance progression for each club across sessions
+- Optional rolling average smoothing
+- Quality-shot filtering for more reliable trends
 
 ### 🧠 AI Feedback (Optional)
 - Requires `OPENAI_API_KEY` and `OPENAI_ASSISTANT_ID` environment variables

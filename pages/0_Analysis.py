@@ -5,7 +5,7 @@ import plotly.express as px
 import streamlit as st
 
 from utils.logger import logger
-from utils.data_utils import coerce_numeric, remove_outliers
+from utils.data_utils import coerce_numeric, remove_outliers, classify_shots
 from utils.page_utils import require_data
 from utils.responsive import configure_page
 
@@ -88,12 +88,18 @@ else:  # Select Sessions
         df[df["session_name"].isin(chosen)] if chosen else df.iloc[0:0]
     )
 
+exclude = st.session_state.get("exclude_sessions", [])
+if exclude:
+    df_filtered = df_filtered[~df_filtered["session_name"].isin(exclude)]
+
 filter_outliers = st.checkbox("Filter outliers", value=True)
 
 
 @st.cache_data
-def _apply_outlier_filter(df: pd.DataFrame, cols: tuple[str, ...]) -> pd.DataFrame:
-    return remove_outliers(df, list(cols))
+def _apply_outlier_filter(
+    df: pd.DataFrame, cols: tuple[str, ...], z: float
+) -> pd.DataFrame:
+    return remove_outliers(df, list(cols), z_thresh=z)
 
 
 if filter_outliers:
@@ -107,8 +113,28 @@ if filter_outliers:
         "side_distance",
         "offline_distance",
     )
-    cols_present = tuple(c for c in numeric_cols if c in df_filtered.columns)
-    df_filtered = _apply_outlier_filter(df_filtered, cols_present)
+    cols_present = [c for c in numeric_cols if c in df_filtered.columns]
+    col_sel = st.multiselect(
+        "Outlier metrics", cols_present, default=cols_present
+    )
+    z_thresh = st.slider("Z-score threshold", 1.0, 5.0, 3.0)
+    if col_sel:
+        df_filtered = _apply_outlier_filter(
+            df_filtered, tuple(col_sel), z_thresh
+        )
+
+df_filtered = classify_shots(
+    df_filtered, carry_col="carry_distance", offline_col="offline_distance"
+)
+if "shot_tags" in st.session_state:
+    tag_map = st.session_state["shot_tags"]
+    df_filtered.loc[
+        df_filtered.index.intersection(tag_map.keys()), "Quality"
+    ] = df_filtered.index.map(tag_map)
+
+use_quality = st.checkbox("Use only quality shots", value=False)
+if use_quality and "Quality" in df_filtered.columns:
+    df_filtered = df_filtered[df_filtered["Quality"] == "good"]
 
 overview_tab, benchmark_tab = st.tabs(["Overview", "Benchmarking"])
 
@@ -225,21 +251,29 @@ with benchmark_tab:
             "Metric": "Carry Distance",
             "Average": club_df["carry_distance"].mean(),
             "Std Dev": club_df["carry_distance"].std(),
+            "P25": club_df["carry_distance"].quantile(0.25),
+            "P75": club_df["carry_distance"].quantile(0.75),
         },
         {
             "Metric": "Ball Speed",
             "Average": club_df["ball_speed"].mean(),
             "Std Dev": club_df["ball_speed"].std(),
+            "P25": club_df["ball_speed"].quantile(0.25),
+            "P75": club_df["ball_speed"].quantile(0.75),
         },
         {
             "Metric": "Launch Angle",
             "Average": club_df["launch_angle"].mean(),
             "Std Dev": club_df["launch_angle"].std(),
+            "P25": club_df["launch_angle"].quantile(0.25),
+            "P75": club_df["launch_angle"].quantile(0.75),
         },
         {
             "Metric": "Spin Rate",
             "Average": club_df["spin_rate"].mean(),
             "Std Dev": club_df["spin_rate"].std(),
+            "P25": club_df["spin_rate"].quantile(0.25),
+            "P75": club_df["spin_rate"].quantile(0.75),
         },
     ]
     if has_offline:
@@ -248,6 +282,8 @@ with benchmark_tab:
                 "Metric": "Offline Distance",
                 "Average": club_df["offline_distance"].mean(),
                 "Std Dev": club_df["offline_distance"].std(),
+                "P25": club_df["offline_distance"].quantile(0.25),
+                "P75": club_df["offline_distance"].quantile(0.75),
             }
         )
     if "total_distance" in club_df:
@@ -257,6 +293,8 @@ with benchmark_tab:
                 "Metric": "Total Distance",
                 "Average": club_df["total_distance"].mean(),
                 "Std Dev": club_df["total_distance"].std(),
+                "P25": club_df["total_distance"].quantile(0.25),
+                "P75": club_df["total_distance"].quantile(0.75),
             },
         )
 
@@ -265,6 +303,9 @@ with benchmark_tab:
     metrics_df["Std Dev"] = metrics_df["Std Dev"].fillna("-").apply(
         lambda x: f"{x:.1f}" if isinstance(x, float) else x
     )
+    for col in ("P25", "P75"):
+        if col in metrics_df.columns:
+            metrics_df[col] = metrics_df[col].round(1)
     st.dataframe(metrics_df, use_container_width=True)
     if not has_offline:
         st.info("Offline distance metrics not available.")
