@@ -77,7 +77,11 @@ exclude = st.session_state.get("exclude_sessions", [])
 if exclude:
     df_filtered = df_filtered[~df_filtered["session_name"].isin(exclude)]
 
-filter_outliers = st.checkbox("Filter outliers", value=True)
+filter_outliers = st.checkbox(
+    "Remove statistical outliers",
+    value=True,
+    help="Drop shots with extreme values so a few wild swings don't skew averages",
+)
 
 
 @st.cache_data
@@ -117,7 +121,11 @@ if "shot_tags" in st.session_state:
         df_filtered.index.intersection(tag_map.keys()), "Quality"
     ] = df_filtered.index.map(tag_map)
 
-use_quality = st.checkbox("Use only quality shots", value=False)
+use_quality = st.checkbox(
+    "Include only 'good' shots",
+    value=False,
+    help="Keep shots labelled as 'good' and ignore ones tagged 'miss' or 'outlier'",
+)
 if use_quality and "Quality" in df_filtered.columns:
     df_filtered = df_filtered[df_filtered["Quality"] == "good"]
 

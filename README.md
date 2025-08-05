@@ -29,6 +29,13 @@ A Streamlit-based app for analyzing and improving your golf performance using da
 - Optional rolling average smoothing
 - Quality-shot filtering for more reliable trends
 
+### 🔍 Shot Quality & Outlier Filtering
+- **Shot Quality** – shots are labelled `good`, `miss` or `outlier` based on
+  carry consistency and lateral dispersion. Enabling "Include only 'good'
+  shots" hides misses and extreme mis-hits.
+- **Outlier Filtering** – removes shots with extreme numeric values using a
+  robust z-score / IQR rule so a few wild swings don't skew averages.
+
 ### 🧠 AI Feedback (Optional)
 - Requires `OPENAI_API_KEY` and `OPENAI_ASSISTANT_ID` environment variables
 - Club insight summaries and session-wide AI analysis
