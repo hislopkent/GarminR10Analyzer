@@ -1,3 +1,5 @@
+"""Utility helpers for working with Garmin shot data."""
+
 import pandas as pd
 
 
@@ -16,15 +18,32 @@ def coerce_numeric(series, errors: str = "coerce"):
     return pd.to_numeric(series, errors=errors)
 
 
-def remove_outliers(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+def remove_outliers(
+    df: pd.DataFrame,
+    cols: list[str],
+    *,
+    z_thresh: float = 3.0,
+    iqr_mult: float = 1.5,
+) -> pd.DataFrame:
     """Return ``df`` with outliers removed for the given ``cols``.
 
-    The 1.5 * IQR rule is applied per column. When a club column (``club`` or
-    ``Club``) is present, the rule is evaluated within each club so that
-    legitimate shots for one club are not discarded because of another club's
-    distances. Rows falling outside the acceptable range for **any** provided
-    column are dropped. Columns not present in ``df`` are ignored. ``df`` is
-    not modified in place.
+    Parameters
+    ----------
+    df:
+        Input dataframe.
+    cols:
+        Columns to evaluate for outliers.
+    z_thresh:
+        Z-score threshold based on the median absolute deviation.  The default
+        is ``3`` which is roughly equivalent to Tukey's 1.5 * IQR rule.
+    iqr_mult:
+        Multiplier for the IQR fallback when MAD is zero.  A value of ``1.5``
+        matches the conventional IQR rule.
+
+    When a club column (``club`` or ``Club``) is present the outlier rule is
+    evaluated within each club.  Rows falling outside the acceptable range for
+    **any** provided column are dropped. Columns not present in ``df`` are
+    ignored. ``df`` is not modified in place.
     """
 
     filtered = df.copy()
@@ -38,12 +57,12 @@ def remove_outliers(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
         mad = (valid - median).abs().median()
         if mad > 0:
             z = 0.6745 * (series - median) / mad
-            return (z.abs() <= 3) | series.isna()
+            return (z.abs() <= z_thresh) | series.isna()
         q1 = valid.quantile(0.25)
         q3 = valid.quantile(0.75)
         iqr = q3 - q1
-        lower = q1 - 1.5 * iqr
-        upper = q3 + 1.5 * iqr
+        lower = q1 - iqr_mult * iqr
+        upper = q3 + iqr_mult * iqr
         return series.between(lower, upper) | series.isna()
 
     masks = []
@@ -84,4 +103,47 @@ def derive_offline_distance(df: pd.DataFrame) -> pd.DataFrame:
             df["Offline"] = coerce_numeric(df[col])
             break
 
+    return df
+
+
+def classify_shots(
+    df: pd.DataFrame,
+    carry_col: str = "Carry Distance",
+    offline_col: str = "Offline",
+) -> pd.DataFrame:
+    """Return ``df`` with a ``Quality`` column describing shot quality.
+
+    Shots are labelled ``good``, ``miss`` or ``outlier`` based on simple
+    heuristics of carry distance consistency and lateral dispersion. Existing
+    ``Quality`` values are overwritten. The input dataframe is not modified in
+    place.
+    """
+
+    df = df.copy()
+    if carry_col in df.columns:
+        df[carry_col] = coerce_numeric(df[carry_col])
+        median = df[carry_col].median()
+        mad = (df[carry_col] - median).abs().median()
+    else:
+        median = mad = None
+    if offline_col in df.columns:
+        df[offline_col] = coerce_numeric(df[offline_col])
+
+    def _label(row: pd.Series) -> str:
+        carry = row.get(carry_col)
+        offline = row.get(offline_col)
+        if pd.notna(offline) and abs(offline) > 15:
+            return "outlier"
+        if median is not None and pd.notna(carry):
+            if mad and mad > 0:
+                z = 0.6745 * (carry - median) / mad
+                if abs(z) > 3:
+                    return "outlier"
+            if abs(carry - median) > 10 or (
+                pd.notna(offline) and abs(offline) > 7
+            ):
+                return "miss"
+        return "good"
+
+    df["Quality"] = df.apply(_label, axis=1)
     return df

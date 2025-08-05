@@ -1,5 +1,5 @@
 import pandas as pd
-from utils.data_utils import remove_outliers, derive_offline_distance
+from utils.data_utils import remove_outliers, derive_offline_distance, classify_shots
 
 def test_remove_outliers_drops_extreme_values():
     df = pd.DataFrame({'Metric': [1, 2, 3, 100]})
@@ -37,6 +37,14 @@ def test_remove_outliers_groups_by_club():
     assert 50 in wedge_carries.values
 
 
+def test_remove_outliers_custom_threshold():
+    df = pd.DataFrame({'Metric': [1, 2, 3, 10]})
+    tight = remove_outliers(df, ['Metric'], z_thresh=1.0)
+    assert 10 not in tight['Metric'].values
+    loose = remove_outliers(df, ['Metric'], z_thresh=10.0)
+    assert 10 in loose['Metric'].values
+
+
 def test_derive_offline_distance_from_side():
     df = pd.DataFrame({"Side Distance": [5, -3]})
     result = derive_offline_distance(df)
@@ -49,3 +57,12 @@ def test_derive_offline_distance_from_side_column():
     result = derive_offline_distance(df)
     assert "Offline" in result.columns
     assert result["Offline"].tolist() == [4, -2]
+
+
+def test_classify_shots_labels_quality():
+    df = pd.DataFrame({
+        'Carry Distance': [200, 50, 205],
+        'Offline': [0, 20, -2]
+    })
+    result = classify_shots(df)
+    assert result['Quality'].tolist() == ['good', 'outlier', 'good']
