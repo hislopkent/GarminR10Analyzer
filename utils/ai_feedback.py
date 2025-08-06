@@ -1,6 +1,6 @@
 """Helpers for generating natural language feedback via OpenAI APIs."""
 
-from typing import Dict
+from typing import Dict, Any
 
 import pandas as pd
 from .data_utils import coerce_numeric
@@ -8,17 +8,18 @@ from .openai_utils import get_openai_client
 
 
 def generate_ai_summary(club_name, df):
-    """Return a short coaching-style summary for ``club_name``.
+    """Return a short coaching-style summary and stats for ``club_name``.
 
     The function calculates a few aggregate statistics for the selected club
-    and feeds them to an OpenAI Assistant.  If the required credentials are not
-    configured the function returns a friendly warning instead of raising an
-    exception.
+    and feeds them to an OpenAI Assistant. If credentials are missing the
+    returned summary contains a friendly warning instead of raising an
+    exception. Both the text summary and the underlying stats are returned so
+    callers can display the numbers that informed the model's response.
     """
 
     shots = df[df["Club"] == club_name]
     if shots.empty:
-        return "No data for this club."
+        return "No data for this club.", {}
 
     carry_col = "Carry Distance" if "Carry Distance" in shots.columns else "Carry"
     shots = shots.copy()
@@ -50,32 +51,42 @@ You're a golf performance coach trained in Jon Sherman's Four Foundations. I use
 Explain what this means for my consistency and what to do in practice. Be specific and encouraging. Mention if anything is a standout or weak point.
 """
 
+    stats = {
+        "Carry": round(carry, 1) if carry == carry else carry,
+        "Smash": round(smash, 2) if smash == smash else smash,
+        "Launch": round(launch, 1) if launch == launch else launch,
+        "Backspin": round(backspin) if backspin == backspin else backspin,
+        "Std Dev": round(std_dev, 1) if std_dev == std_dev else std_dev,
+        "Shots": shot_count,
+    }
+
     client = get_openai_client()
     if client is None:
-        return "⚠️ AI credentials missing."
+        return "⚠️ AI credentials missing.", stats
     try:
         response = client.chat.completions.create(
             model="gpt-4o", messages=[{"role": "user", "content": prompt}], temperature=0.7
         )
-        return response.choices[0].message.content.strip()
+        summary = response.choices[0].message.content.strip()
     except Exception as e:
-        return f"⚠️ AI summary error: {e}"
+        summary = f"⚠️ AI summary error: {e}"
+    return summary, stats
 
 
-def generate_ai_batch_summaries(df) -> Dict[str, str]:
+def generate_ai_batch_summaries(df) -> Dict[str, Dict[str, Any]]:
     """Generate AI feedback for multiple clubs.
 
-    This implementation generates one prompt per club using ``generate_ai_summary``
-    to avoid very long prompts that could exceed model token limits.  Returning a
-    mapping of club to summary keeps the public API the same while greatly
-    simplifying parsing of responses.
+    Returns a mapping of club name to a dictionary containing the ``summary``
+    text and the ``stats`` used to produce it. Each club is processed
+    sequentially but callers only need to make a single function call.
     """
 
     if "Club" not in df.columns:
         return {}
 
     clubs = df["Club"].dropna().unique().tolist()
-    summaries: Dict[str, str] = {}
+    summaries: Dict[str, Dict[str, Any]] = {}
     for club in clubs:
-        summaries[club] = generate_ai_summary(club, df)
+        summary, stats = generate_ai_summary(club, df)
+        summaries[club] = {"summary": summary, "stats": stats}
     return summaries
