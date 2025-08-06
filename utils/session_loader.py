@@ -2,6 +2,7 @@
 
 from typing import List
 
+import os
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 
@@ -51,7 +52,8 @@ def load_sessions(files: List[object]) -> pd.DataFrame:
             )
             return None
 
-    with ThreadPoolExecutor() as pool:
+    max_workers = max(1, min(len(files), (os.cpu_count() or 1)))
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
         sessions = [s for s in pool.map(_load, files) if s]
 
     if not sessions:

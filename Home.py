@@ -5,10 +5,9 @@ between reloads. Uploaded CSV files are combined into a single dataframe and
 cached on disk so the user can navigate between pages without losing data.
 """
 
-import atexit
 import json
 import os
-from threading import Timer
+from threading import Lock
 
 import pandas as pd
 import streamlit as st
@@ -22,27 +21,17 @@ st.title("📊 Garmin R10 Analyzer")
 
 CACHE_PATH = os.path.join("sample_data", "session_cache.json")
 
-_persist_timer: Timer | None = None
+# Guard file writes so concurrent Streamlit requests don't clobber the cache
+_persist_lock = Lock()
 
 
-def _cancel_timer() -> None:
-    """Cancel any pending persistence timer on app shutdown."""
+def persist_state() -> None:
+    """Persist uploaded file names and dataframe to disk synchronously.
 
-    global _persist_timer
-    if _persist_timer and _persist_timer.is_alive():
-        _persist_timer.cancel()
-
-
-atexit.register(_cancel_timer)
-
-
-def persist_state(delay: float = 0.5) -> None:
-    """Persist uploaded file names and dataframe to disk with debouncing.
-
-    Previously the cache file was rewritten on every upload or removal which
-    caused unnecessary disk I/O.  This implementation batches rapid successive
-    calls by delaying the actual write slightly and cancelling any pending
-    writes if a new request arrives within the ``delay`` window.
+    The previous implementation used a background ``Timer`` to debounce writes
+    which risked data loss if the process exited before the timer fired.  This
+    version performs the write immediately using an atomic ``os.replace`` so
+    that state is always saved deterministically.
     """
 
     data = {
@@ -50,27 +39,20 @@ def persist_state(delay: float = 0.5) -> None:
         "df": st.session_state.get("session_df", pd.DataFrame()),
     }
 
-    def _write() -> None:
-        try:
-            os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
-            with open(CACHE_PATH, "w", encoding="utf-8") as f:
-                json.dump(
-                    {
-                        "files": data["files"],
-                        "df": data["df"].to_json(orient="split"),
-                    },
-                    f,
-                )
-            logger.info("State persisted with %d file(s)", len(data["files"]))
-        except (OSError, TypeError, ValueError) as exc:  # pragma: no cover
-            logger.warning("Failed to persist state: %s", exc)
-
-    global _persist_timer
-    if _persist_timer and _persist_timer.is_alive():
-        _persist_timer.cancel()
-    _persist_timer = Timer(delay, _write)
-    _persist_timer.daemon = True
-    _persist_timer.start()
+    try:
+        os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
+        tmp_path = f"{CACHE_PATH}.tmp"
+        with _persist_lock, open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(
+                {"files": data["files"], "df": data["df"].to_json(orient="split")},
+                f,
+            )
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, CACHE_PATH)
+        logger.info("State persisted with %d file(s)", len(data["files"]))
+    except (OSError, TypeError, ValueError) as exc:  # pragma: no cover
+        logger.warning("Failed to persist state: %s", exc)
 
 
 def _refresh_session_views() -> None:
@@ -96,9 +78,16 @@ def load_state() -> None:
             return
         st.session_state["uploaded_files"] = data.get("files", [])
         df_json = data.get("df")
-        st.session_state["session_df"] = (
-            pd.read_json(df_json, orient="split") if df_json else pd.DataFrame()
-        )
+        if df_json:
+            try:
+                st.session_state["session_df"] = pd.read_json(
+                    df_json, orient="split"
+                )
+            except ValueError as exc:  # pragma: no cover - rarely triggered
+                logger.warning("Failed to parse cached dataframe: %s", exc)
+                st.session_state["session_df"] = pd.DataFrame()
+        else:
+            st.session_state["session_df"] = pd.DataFrame()
         _refresh_session_views()
 
 
@@ -159,25 +148,33 @@ else:
 def remove_file(name: str) -> None:
     """Remove a file and its associated rows from session state and cache."""
 
-    if name in st.session_state["uploaded_files"]:
-        st.session_state["uploaded_files"].remove(name)
-        if "session_df" in st.session_state and not st.session_state["session_df"].empty:
-            session_df = st.session_state["session_df"]
-            if "Source File" in session_df.columns:
-                st.session_state["session_df"] = session_df[
-                    session_df["Source File"] != name
-                ]
-            elif "Session Name" in session_df.columns:
-                st.session_state["session_df"] = session_df[
-                    session_df["Session Name"] != name
-                ]
-            else:
-                logger.warning(
-                    "Missing 'Source File' column while removing %s", name
-                )
-            _refresh_session_views()
-        persist_state()
-        _rerun()
+    if name not in st.session_state["uploaded_files"]:
+        return
+
+    # Ensure the dataframe contains a column we can filter on. If neither
+    # identifier is present we abort to avoid desynchronising the cache.
+    if (
+        "session_df" in st.session_state
+        and not st.session_state["session_df"].empty
+        and "Source File" not in st.session_state["session_df"].columns
+        and "Session Name" not in st.session_state["session_df"].columns
+    ):
+        logger.warning("Cannot remove %s; missing identifier columns", name)
+        st.error(
+            "Uploaded data is missing 'Source File' or 'Session Name' columns."
+        )
+        return
+
+    st.session_state["uploaded_files"].remove(name)
+    if "session_df" in st.session_state and not st.session_state["session_df"].empty:
+        session_df = st.session_state["session_df"]
+        if "Source File" in session_df.columns:
+            st.session_state["session_df"] = session_df[session_df["Source File"] != name]
+        elif "Session Name" in session_df.columns:
+            st.session_state["session_df"] = session_df[session_df["Session Name"] != name]
+        _refresh_session_views()
+    persist_state()
+    _rerun()
 
 
 if st.session_state.get("uploaded_files"):
