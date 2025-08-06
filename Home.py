@@ -49,7 +49,7 @@ def load_state() -> None:
         except (OSError, json.JSONDecodeError) as exc:  # pragma: no cover - rare
             logger.warning("Failed to load cached state: %s", exc)
             return
-        st.session_state["uploaded_files"] = data.get("files", [])
+        st.session_state["uploaded_sessions"] = data.get("sessions", data.get("files", []))
         st.session_state["shot_tags"] = {
             int(k): v for k, v in data.get("shot_tags", {}).items()
         }
@@ -68,18 +68,18 @@ def load_state() -> None:
         else:
             st.session_state["session_df"] = pd.DataFrame()
 
-        # If session IDs are missing but files are present, generate them
+        # If session IDs are missing but sessions are present, generate them
         if (
             st.session_state.get("session_df") is not None
             and not st.session_state["session_df"].empty
             and "Session ID" not in st.session_state["session_df"].columns
         ):
             sid_map = {}
-            for fname in st.session_state["session_df"]["Source File"].unique():
+            for sname in st.session_state["session_df"]["Session Name"].unique():
                 sid = uuid.uuid4().hex
-                sid_map[fname] = sid
+                sid_map[sname] = sid
                 st.session_state["session_df"].loc[
-                    st.session_state["session_df"]["Source File"] == fname,
+                    st.session_state["session_df"]["Session Name"] == sname,
                     "Session ID",
                 ] = sid
             st.session_state["session_ids"] = sid_map
@@ -96,10 +96,10 @@ def _rerun() -> None:
 
 
 # Initialize state on first run
-if "uploaded_files" not in st.session_state:
+if "uploaded_sessions" not in st.session_state:
     load_state()
-    if "uploaded_files" not in st.session_state:
-        st.session_state["uploaded_files"] = []
+    if "uploaded_sessions" not in st.session_state:
+        st.session_state["uploaded_sessions"] = []
 
 
 uploaded_files = st.file_uploader(
@@ -109,52 +109,54 @@ uploaded_files = st.file_uploader(
 )
 
 if uploaded_files:
-    existing = set(st.session_state.get("uploaded_files", []))
-    new_files = [f for f in uploaded_files if f.name not in existing]
-    dupes = [f.name for f in uploaded_files if f.name in existing]
+    df_new = load_sessions(uploaded_files)
+    existing = set(st.session_state.get("uploaded_sessions", []))
+    new_names = df_new["Session Name"].drop_duplicates().tolist()
+    dupes = [n for n in new_names if n in existing]
     if dupes:
-        st.warning("Skipping duplicate file(s): " + ", ".join(dupes))
-    if new_files:
-        df_new = load_sessions(new_files)
-        if not df_new.empty:
-            if (
-                "session_df" in st.session_state
-                and st.session_state["session_df"].shape[0] > 0
-            ):
-                st.session_state["session_df"] = pd.concat(
-                    [st.session_state["session_df"], df_new], ignore_index=True
-                )
-            else:
-                st.session_state["session_df"] = df_new
-
-            ids = (
-                df_new[["Session ID", "Source File"]]
-                .drop_duplicates()
-                .to_dict("records")
+        st.warning("Skipping duplicate session(s): " + ", ".join(dupes))
+    df_new = df_new[~df_new["Session Name"].isin(dupes)]
+    if not df_new.empty:
+        if (
+            "session_df" in st.session_state
+            and st.session_state["session_df"].shape[0] > 0
+        ):
+            st.session_state["session_df"] = pd.concat(
+                [st.session_state["session_df"], df_new], ignore_index=True
             )
-            for rec in ids:
-                st.session_state["session_ids"][rec["Source File"]] = rec["Session ID"]
-            _refresh_session_views()
-        st.session_state["uploaded_files"].extend([f.name for f in new_files])
+        else:
+            st.session_state["session_df"] = df_new
+
+        ids = (
+            df_new[["Session ID", "Session Name"]]
+            .drop_duplicates()
+            .to_dict("records")
+        )
+        for rec in ids:
+            st.session_state["session_ids"][rec["Session Name"]] = rec["Session ID"]
+        _refresh_session_views()
+        st.session_state["uploaded_sessions"].extend(
+            [name for name in new_names if name not in dupes]
+        )
         persist_state()
         st.success(
-            f"✅ {len(new_files)} new file(s) uploaded. Navigate to any page to begin.",
+            f"✅ {len(new_names) - len(dupes)} new session(s) uploaded. Navigate to any page to begin.",
         )
-elif st.session_state.get("uploaded_files"):
+elif st.session_state.get("uploaded_sessions"):
     st.info(
-        f"📁 {len(st.session_state['uploaded_files'])} file(s) currently stored. "
+        f"📁 {len(st.session_state['uploaded_sessions'])} session(s) currently stored. "
         "You can navigate to any page or clear/remove them below."
     )
 else:
     st.info("📤 Upload files here to begin.")
 
 
-def remove_file(name: str) -> None:
-    """Remove a file and its associated rows from session state and cache."""
+def remove_session(name: str) -> None:
+    """Remove a session and its associated rows from session state and cache."""
 
-    if name not in st.session_state["uploaded_files"]:
+    if name not in st.session_state["uploaded_sessions"]:
         return
-    st.session_state["uploaded_files"].remove(name)
+    st.session_state["uploaded_sessions"].remove(name)
     sid = st.session_state.get("session_ids", {}).pop(name, None)
     if (
         sid
@@ -170,16 +172,16 @@ def remove_file(name: str) -> None:
     _rerun()
 
 
-if st.session_state.get("uploaded_files"):
+if st.session_state.get("uploaded_sessions"):
     st.subheader("Uploaded Sessions")
-    for fname in st.session_state["uploaded_files"]:
+    for sname in st.session_state["uploaded_sessions"]:
         cols = st.columns([0.8, 0.2])
-        cols[0].write(fname)
-        if cols[1].button("Remove", key=f"rm_{fname}"):
-            remove_file(fname)
+        cols[0].write(sname)
+        if cols[1].button("Remove", key=f"rm_{sname}"):
+            remove_session(sname)
 
-    if st.button("Clear uploaded files"):
-        st.session_state.pop("uploaded_files", None)
+    if st.button("Clear uploaded sessions"):
+        st.session_state.pop("uploaded_sessions", None)
         st.session_state.pop("session_df", None)
         st.session_state.pop("df_all", None)
         st.session_state.pop("club_data", None)
