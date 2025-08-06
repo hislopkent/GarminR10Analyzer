@@ -123,6 +123,20 @@ def _outlier_filter_ui(df: pd.DataFrame) -> pd.DataFrame:
     )
     if not filter_outliers:
         return df
+    with st.expander("ℹ️ How filtering works", expanded=False):
+        st.markdown(
+            """
+            Outlier filtering removes shots with unusual values so that averages reflect
+            typical swings.
+
+            * **Z-score threshold** – keeps shots within a number of standard deviations
+              from the mean.
+            * **IQR multiplier** – for the statistical method, keeps shots inside the
+              interquartile range multiplied by this value.
+            * **Contamination** – for the adaptive method, approximate fraction of shots
+              expected to be outliers.
+            """
+        )
     numeric_cols = (
         "carry_distance",
         "total_distance",
@@ -149,11 +163,29 @@ def _outlier_filter_ui(df: pd.DataFrame) -> pd.DataFrame:
     iqr_mult = 1.5
     contamination = "auto"
     if method == "mad":
-        z_thresh = st.slider("Z-score threshold", 1.0, 5.0, 3.0)
-        iqr_mult = st.slider("IQR multiplier", 1.0, 3.0, 1.5)
+        z_thresh = st.slider(
+            "Z-score threshold",
+            1.0,
+            5.0,
+            3.0,
+            help="Maximum standard deviations from the mean to keep; lower removes more shots.",
+        )
+        iqr_mult = st.slider(
+            "IQR multiplier",
+            1.0,
+            3.0,
+            1.5,
+            help="Multiplier for the interquartile range; lower values are stricter.",
+        )
     else:
         z_thresh = 3.0
-        contamination = st.slider("Contamination", 0.01, 0.5, 0.1)
+        contamination = st.slider(
+            "Contamination",
+            0.01,
+            0.5,
+            0.1,
+            help="Expected fraction of shots that are outliers for Isolation Forest.",
+        )
     if col_sel:
         before = df.copy()
         df = _apply_outlier_filter(
@@ -258,8 +290,20 @@ with overview_tab:
     )
 
     st.markdown("## 📊 Coach’s Notes")
-    carry_warn = st.slider("Carry variability warning (std yds)", 5.0, 30.0, 15.0)
-    wedge_thresh = st.slider("Wedge low-carry threshold (yds)", 50.0, 150.0, 100.0)
+    carry_warn = st.slider(
+        "Carry variability warning (std yds)",
+        5.0,
+        30.0,
+        15.0,
+        help="Highlight clubs whose carry distance standard deviation exceeds this value.",
+    )
+    wedge_thresh = st.slider(
+        "Wedge low-carry threshold (yds)",
+        50.0,
+        150.0,
+        100.0,
+        help="Show an info note if a wedge's average carry is below this distance.",
+    )
     for _, row in club_summary.iterrows():
         if row["std_carry"] > carry_warn:
             st.warning(
@@ -434,12 +478,22 @@ with benchmark_tab:
     carry_std = club_df["carry_distance"].std()
     offline_std = club_df["offline_distance"].std() if has_offline else None
     carry_thresh = st.slider(
-        "Carry consistency threshold (std yds)", 5.0, 30.0, 15.0, key="carry_fb"
+        "Carry consistency threshold (std yds)",
+        5.0,
+        30.0,
+        15.0,
+        key="carry_fb",
+        help="Warn when carry distance variation exceeds this standard deviation.",
     )
     offline_thresh = None
     if has_offline:
         offline_thresh = st.slider(
-            "Offline dispersion threshold (std yds)", 5.0, 30.0, 10.0, key="offline_fb"
+            "Offline dispersion threshold (std yds)",
+            5.0,
+            30.0,
+            10.0,
+            key="offline_fb",
+            help="Warn when offline distance standard deviation exceeds this value.",
         )
 
     if pd.notna(carry_std) and carry_std > carry_thresh:
