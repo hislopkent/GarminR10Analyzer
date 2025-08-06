@@ -52,14 +52,14 @@ for col in [
     if col in df.columns:
         df[col] = coerce_numeric(df[col])
 
-uploaded_files = st.session_state.get("uploaded_files", [])
-if set(st.session_state.get("ai_files_snapshot", [])) != set(uploaded_files):
+uploaded_sessions = st.session_state.get("uploaded_sessions", [])
+if set(st.session_state.get("ai_sessions_snapshot", [])) != set(uploaded_sessions):
     st.info("📥 New session files detected. Updating summaries...")
     st.session_state["practice_summary"] = []
     for key in list(st.session_state.keys()):
         if key.startswith("ai_"):
             del st.session_state[key]
-    st.session_state["ai_files_snapshot"] = uploaded_files
+    st.session_state["ai_sessions_snapshot"] = uploaded_sessions
 
 drill_map = recommend_drills(df)
 
@@ -84,12 +84,12 @@ with insight_tab:
                     "stats": stats,
                 }
                 ai_cache[selected_club] = {
-                    "files": uploaded_files,
+                    "sessions": uploaded_sessions,
                     "summary": summary,
                     "stats": stats,
                 }
                 _save_ai_cache(ai_cache)
-                st.session_state["ai_files_snapshot"] = uploaded_files
+                st.session_state["ai_sessions_snapshot"] = uploaded_sessions
                 st.success("✅ Summary generated!")
 
         if st.button("Generate Summary"):
@@ -102,7 +102,7 @@ with insight_tab:
         cached = st.session_state.get(f"ai_{selected_club}")
         if not cached:
             disk_cached = ai_cache.get(selected_club)
-            if disk_cached and disk_cached.get("files") == uploaded_files:
+            if disk_cached and disk_cached.get("sessions", disk_cached.get("files")) == uploaded_sessions:
                 st.session_state[f"ai_{selected_club}"] = disk_cached
                 cached = disk_cached
         if cached:
@@ -127,7 +127,7 @@ with session_tab:
                     entry["summary"] = summaries[club]["summary"]
                     entry["stats"] = summaries[club]["stats"]
             st.session_state["practice_summary"] = base_stats
-            st.session_state["ai_files_snapshot"] = uploaded_files
+            st.session_state["ai_sessions_snapshot"] = uploaded_sessions
             st.success("✅ Summary generated!")
     results = st.session_state.get("practice_summary", [])
     for entry in results:
