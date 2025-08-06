@@ -20,4 +20,6 @@ COLUMN_NORMALIZATION_MAP = {
     "Side Distance": "side_distance",
     "Offline Distance": "offline_distance",
     "Offline": "offline_distance",
+    "Session ID": "session_id",
+    "Source File": "source_file",
 }

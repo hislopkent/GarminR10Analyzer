@@ -3,6 +3,7 @@
 from typing import List
 
 import os
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 
@@ -69,6 +70,7 @@ def load_sessions(files: List[object]) -> pd.DataFrame:
         df = session["df"]
         first_dt = session["first_dt"]
         file_name = session["file_name"]
+        session_id = uuid.uuid4().hex
 
         if pd.notna(first_dt):
             date_str = first_dt.date().isoformat()
@@ -82,6 +84,7 @@ def load_sessions(files: List[object]) -> pd.DataFrame:
 
         df["Session Name"] = session_name
         df["Source File"] = file_name
+        df["Session ID"] = session_id
         dfs.append(df)
 
     return pd.concat(dfs, ignore_index=True)

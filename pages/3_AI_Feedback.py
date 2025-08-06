@@ -1,5 +1,8 @@
 """Consolidated AI insights and practice summaries."""
 
+import json
+import os
+
 import streamlit as st
 import pandas as pd
 
@@ -14,6 +17,27 @@ from utils.responsive import configure_page
 logger.info("📄 Page loaded: AI Feedback")
 configure_page()
 st.title("🧠 AI Feedback")
+
+AI_CACHE_PATH = os.path.join("sample_data", "ai_cache.json")
+
+
+def _load_ai_cache() -> dict:
+    if os.path.exists(AI_CACHE_PATH):
+        try:
+            with open(AI_CACHE_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError):  # pragma: no cover - rare
+            return {}
+    return {}
+
+
+def _save_ai_cache(cache: dict) -> None:
+    os.makedirs(os.path.dirname(AI_CACHE_PATH), exist_ok=True)
+    with open(AI_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(cache, f)
+
+
+ai_cache = _load_ai_cache()
 
 df = require_data().copy()
 for col in [
@@ -59,6 +83,12 @@ with insight_tab:
                     "summary": summary,
                     "stats": stats,
                 }
+                ai_cache[selected_club] = {
+                    "files": uploaded_files,
+                    "summary": summary,
+                    "stats": stats,
+                }
+                _save_ai_cache(ai_cache)
                 st.session_state["ai_files_snapshot"] = uploaded_files
                 st.success("✅ Summary generated!")
 
@@ -70,6 +100,11 @@ with insight_tab:
         st.session_state["_prev_club"] = selected_club
 
         cached = st.session_state.get(f"ai_{selected_club}")
+        if not cached:
+            disk_cached = ai_cache.get(selected_club)
+            if disk_cached and disk_cached.get("files") == uploaded_files:
+                st.session_state[f"ai_{selected_club}"] = disk_cached
+                cached = disk_cached
         if cached:
             st.markdown("### 💬 Summary")
             st.write(cached["summary"])
