@@ -49,8 +49,16 @@ def test_remove_outliers_custom_threshold():
 def test_remove_outliers_isolation_forest():
     pytest.importorskip("sklearn")
     df = pd.DataFrame({'Metric': [10, 11, 9, 12, 10, 11, 9, 12, 10, 11, 10, 11, 9, 12, 10, 11, 9, 12, 10, 11, 50]})
-    filtered = remove_outliers(df, ['Metric'], method='isolation')
+    filtered = remove_outliers(df, ['Metric'], method='isolation', contamination=0.1)
     assert 50 not in filtered['Metric'].values
+
+
+def test_remove_outliers_iqr_multiplier():
+    df = pd.DataFrame({'Metric': [1, 1, 1, 2, 100]})
+    tight = remove_outliers(df, ['Metric'], z_thresh=3.0, iqr_mult=1.0)
+    assert 100 not in tight['Metric'].values
+    loose = remove_outliers(df, ['Metric'], z_thresh=3.0, iqr_mult=200.0)
+    assert 100 in loose['Metric'].values
 
 
 def test_derive_offline_distance_from_side():
