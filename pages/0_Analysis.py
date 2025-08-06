@@ -1,5 +1,7 @@
 """Combined dashboard and benchmarking analysis page."""
 
+from typing import Union
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -55,9 +57,21 @@ session_names = df["session_name"].dropna().unique().tolist()
 
 @st.cache_data
 def _apply_outlier_filter(
-    df: pd.DataFrame, cols: tuple[str, ...], z: float, method: str
+    df: pd.DataFrame,
+    cols: tuple[str, ...],
+    z: float,
+    method: str,
+    iqr: float,
+    contamination: Union[float, str],
 ) -> pd.DataFrame:
-    return remove_outliers(df, list(cols), z_thresh=z, method=method)
+    return remove_outliers(
+        df,
+        list(cols),
+        z_thresh=z,
+        iqr_mult=iqr,
+        method=method,
+        contamination=contamination,
+    )
 
 
 with st.expander("Advanced Filters", expanded=False):
@@ -134,14 +148,31 @@ with st.expander("Advanced Filters", expanded=False):
                 "scikit-learn required for adaptive method; using statistical instead"
             )
             method = "mad"
+
+        iqr_mult = 1.5
+        contamination = "auto"
         if method == "mad":
             z_thresh = st.slider("Z-score threshold", 1.0, 5.0, 3.0)
+            iqr_mult = st.slider("IQR multiplier", 1.0, 3.0, 1.5)
         else:
             z_thresh = 3.0
+            contamination = st.slider("Contamination", 0.01, 0.5, 0.1)
+
         if col_sel:
+            before = df_filtered.copy()
             df_filtered = _apply_outlier_filter(
-                df_filtered, tuple(col_sel), z_thresh, method
+                df_filtered,
+                tuple(col_sel),
+                z_thresh,
+                method,
+                iqr_mult,
+                contamination,
             )
+            removed = before.loc[~before.index.isin(df_filtered.index)]
+            if not removed.empty:
+                st.info(f"Removed {len(removed)} shots as outliers")
+                with st.expander("Show removed outliers"):
+                    st.dataframe(removed)
 
     df_filtered = classify_shots(
         df_filtered, carry_col="carry_distance", offline_col="offline_distance"
@@ -169,10 +200,16 @@ with overview_tab:
     club_summary = df_filtered.groupby("club").agg(
         total_shots=("carry_distance", "count"),
         avg_carry=("carry_distance", "mean"),
+        median_carry=("carry_distance", "median"),
+        p25_carry=("carry_distance", lambda x: x.quantile(0.25)),
+        p75_carry=("carry_distance", lambda x: x.quantile(0.75)),
         std_carry=("carry_distance", "std"),
         avg_ball_speed=("ball_speed", "mean"),
+        median_ball_speed=("ball_speed", "median"),
         avg_launch_angle=("launch_angle", "mean"),
+        median_launch_angle=("launch_angle", "median"),
         avg_spin_rate=("spin_rate", "mean"),
+        median_spin_rate=("spin_rate", "median"),
     ).reset_index()
 
     club_summary = club_summary[club_summary["total_shots"] >= 6]
@@ -181,10 +218,16 @@ with overview_tab:
         club_summary.style.format(
             {
                 "avg_carry": "{:.1f}",
+                "median_carry": "{:.1f}",
+                "p25_carry": "{:.1f}",
+                "p75_carry": "{:.1f}",
                 "std_carry": "{:.1f}",
                 "avg_ball_speed": "{:.1f}",
+                "median_ball_speed": "{:.1f}",
                 "avg_launch_angle": "{:.1f}",
+                "median_launch_angle": "{:.1f}",
                 "avg_spin_rate": "{:.0f}",
+                "median_spin_rate": "{:.0f}",
             }
         )
     )
@@ -216,13 +259,15 @@ with overview_tab:
     )
 
     st.markdown("## 📊 Coach’s Notes")
+    carry_warn = st.slider("Carry variability warning (std yds)", 5.0, 30.0, 15.0)
+    wedge_thresh = st.slider("Wedge low-carry threshold (yds)", 50.0, 150.0, 100.0)
     for _, row in club_summary.iterrows():
-        if row["std_carry"] > 15:
+        if row["std_carry"] > carry_warn:
             st.warning(
                 f"**{row['club']}** carry varies {row['std_carry']:.1f} yds. "
                 f"Try a [tempo drill](https://www.golfdigest.com/story/golf-tempo-drills) to tighten dispersion."
             )
-        if row["avg_carry"] < 100 and "wedge" in str(row["club"]).lower():
+        if row["avg_carry"] < wedge_thresh and "wedge" in str(row["club"]).lower():
             st.info(
                 f"**{row['club']}** carry seems low. Work on [ball-first contact](https://www.golf.com/instruction/solid-contact-drill)."
             )
@@ -274,6 +319,8 @@ with benchmark_tab:
             "Metric": "Carry Distance",
             "Average": club_df["carry_distance"].mean(),
             "Std Dev": club_df["carry_distance"].std(),
+            "Min": club_df["carry_distance"].min(),
+            "Max": club_df["carry_distance"].max(),
             "P25": club_df["carry_distance"].quantile(0.25),
             "P75": club_df["carry_distance"].quantile(0.75),
         },
@@ -281,6 +328,8 @@ with benchmark_tab:
             "Metric": "Ball Speed",
             "Average": club_df["ball_speed"].mean(),
             "Std Dev": club_df["ball_speed"].std(),
+            "Min": club_df["ball_speed"].min(),
+            "Max": club_df["ball_speed"].max(),
             "P25": club_df["ball_speed"].quantile(0.25),
             "P75": club_df["ball_speed"].quantile(0.75),
         },
@@ -288,6 +337,8 @@ with benchmark_tab:
             "Metric": "Launch Angle",
             "Average": club_df["launch_angle"].mean(),
             "Std Dev": club_df["launch_angle"].std(),
+            "Min": club_df["launch_angle"].min(),
+            "Max": club_df["launch_angle"].max(),
             "P25": club_df["launch_angle"].quantile(0.25),
             "P75": club_df["launch_angle"].quantile(0.75),
         },
@@ -295,6 +346,8 @@ with benchmark_tab:
             "Metric": "Spin Rate",
             "Average": club_df["spin_rate"].mean(),
             "Std Dev": club_df["spin_rate"].std(),
+            "Min": club_df["spin_rate"].min(),
+            "Max": club_df["spin_rate"].max(),
             "P25": club_df["spin_rate"].quantile(0.25),
             "P75": club_df["spin_rate"].quantile(0.75),
         },
@@ -305,6 +358,8 @@ with benchmark_tab:
                 "Metric": "Offline Distance",
                 "Average": club_df["offline_distance"].mean(),
                 "Std Dev": club_df["offline_distance"].std(),
+                "Min": club_df["offline_distance"].min(),
+                "Max": club_df["offline_distance"].max(),
                 "P25": club_df["offline_distance"].quantile(0.25),
                 "P75": club_df["offline_distance"].quantile(0.75),
             }
@@ -316,6 +371,8 @@ with benchmark_tab:
                 "Metric": "Total Distance",
                 "Average": club_df["total_distance"].mean(),
                 "Std Dev": club_df["total_distance"].std(),
+                "Min": club_df["total_distance"].min(),
+                "Max": club_df["total_distance"].max(),
                 "P25": club_df["total_distance"].quantile(0.25),
                 "P75": club_df["total_distance"].quantile(0.75),
             },
@@ -326,7 +383,7 @@ with benchmark_tab:
     metrics_df["Std Dev"] = metrics_df["Std Dev"].fillna("-").apply(
         lambda x: f"{x:.1f}" if isinstance(x, float) else x
     )
-    for col in ("P25", "P75"):
+    for col in ("Min", "Max", "P25", "P75"):
         if col in metrics_df.columns:
             metrics_df[col] = metrics_df[col].round(1)
     st.dataframe(metrics_df, use_container_width=True)
@@ -361,19 +418,40 @@ with benchmark_tab:
     else:
         st.info("Offline distance data not available for dispersion plot.")
 
+    trend = (
+        club_df.groupby("session_name")["carry_distance"].mean().reset_index()
+    )
+    if len(trend) > 1:
+        fig_trend = px.line(
+            trend,
+            x="session_name",
+            y="carry_distance",
+            title=f"Carry Distance Trend – {selected_club}",
+            labels={"carry_distance": "Avg Carry (yds)", "session_name": "Session"},
+        )
+        st.plotly_chart(fig_trend, use_container_width=True)
+
     st.markdown("## 🧠 Coach’s Feedback")
     carry_std = club_df["carry_distance"].std()
     offline_std = club_df["offline_distance"].std() if has_offline else None
+    carry_thresh = st.slider(
+        "Carry consistency threshold (std yds)", 5.0, 30.0, 15.0, key="carry_fb"
+    )
+    offline_thresh = None
+    if has_offline:
+        offline_thresh = st.slider(
+            "Offline dispersion threshold (std yds)", 5.0, 30.0, 10.0, key="offline_fb"
+        )
 
-    if pd.notna(carry_std) and carry_std > 15:
+    if pd.notna(carry_std) and carry_std > carry_thresh:
         st.warning(
             "⚠️ High inconsistency in carry distance – consider working on strike location and tempo control. "
             "Try the [three-ball ladder drill](https://practical-golf.com/three-ball-ladder-drill)."
         )
     else:
         st.success("✅ Carry distance shows good consistency.")
-    if offline_std is not None:
-        if pd.notna(offline_std) and offline_std > 10:
+    if offline_std is not None and offline_thresh is not None:
+        if pd.notna(offline_std) and offline_std > offline_thresh:
             st.warning(
                 "⚠️ Offline dispersion is wide – work on face angle or path to tighten dispersion. "
                 "[Gate drills](https://www.golfdigest.com/story/gate-drill) can help."
