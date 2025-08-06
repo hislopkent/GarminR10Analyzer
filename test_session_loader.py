@@ -17,6 +17,8 @@ def test_load_sessions_names_by_date():
     names = df["Session Name"].drop_duplicates().tolist()
     assert names == ["2025-08-01", "2025-08-02"]
     assert set(df["Source File"].unique()) == {"a.csv", "b.csv"}
+    assert "Session ID" in df.columns
+    assert len(df["Session ID"].unique()) == 2
 
 
 def test_load_sessions_numbers_duplicate_dates():
@@ -25,3 +27,4 @@ def test_load_sessions_numbers_duplicate_dates():
     df = load_sessions([later, earlier])
     names = df["Session Name"].drop_duplicates().tolist()
     assert names == ["2025-08-01", "2025-08-01 #2"]
+    assert df["Session ID"].nunique() == 2

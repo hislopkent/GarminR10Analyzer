@@ -9,6 +9,7 @@ from utils.logger import logger
 from utils.page_utils import require_data
 from utils.responsive import configure_page
 from utils.data_utils import classify_shots
+from utils.cache import persist_state
 
 logger.info("📄 Page loaded: Sessions")
 configure_page()
@@ -83,6 +84,7 @@ with viewer_tab:
             st.session_state["shot_tags"] = {}
         for _, row in edited.iterrows():
             st.session_state["shot_tags"][row["_idx"]] = row.get("Quality", "good")
+        persist_state()
 
         if edited.empty:
             st.info("No sessions selected.")
@@ -117,6 +119,7 @@ with log_tab:
                 {"Date": date.strftime("%Y-%m-%d"), "Focus": focus_area, "Notes": notes}
             )
             st.success("✅ Entry added.")
+            persist_state()
 
     if st.session_state.practice_log:
         st.markdown("### 📅 Your Practice History")

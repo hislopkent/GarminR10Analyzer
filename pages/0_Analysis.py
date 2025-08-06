@@ -74,20 +74,19 @@ def _apply_outlier_filter(
     )
 
 
-with st.expander("Advanced Filters", expanded=False):
+def _session_filter_ui(df: pd.DataFrame, session_names: list[str]) -> pd.DataFrame:
     session_option = st.selectbox(
         "Choose sessions to analyze",
         ["All Sessions", "Latest Session", "Last 5 Sessions", "Select Sessions"],
     )
-
     if session_option == "All Sessions":
-        df_filtered = df
+        filtered = df
     elif session_option == "Latest Session":
         if "Date" in df.columns and df["Date"].notna().any():
             latest_session = df.loc[df["Date"].idxmax(), "session_name"]
         else:
             latest_session = session_names[-1] if session_names else None
-        df_filtered = (
+        filtered = (
             df[df["session_name"] == latest_session]
             if latest_session
             else df.iloc[0:0]
@@ -100,12 +99,10 @@ with st.expander("Advanced Filters", expanded=False):
         else:
             session_order = session_names
         last_sessions = session_order[-5:]
-        df_filtered = df[df["session_name"].isin(last_sessions)]
-    else:  # Select Sessions
+        filtered = df[df["session_name"].isin(last_sessions)]
+    else:
         chosen = st.multiselect("Select session(s)", session_names)
-        df_filtered = (
-            df[df["session_name"].isin(chosen)] if chosen else df.iloc[0:0]
-        )
+        filtered = df[df["session_name"].isin(chosen)] if chosen else df.iloc[0:0]
 
     exclude = st.multiselect(
         "Exclude sessions from analysis",
@@ -114,83 +111,85 @@ with st.expander("Advanced Filters", expanded=False):
     )
     st.session_state["exclude_sessions"] = exclude
     if exclude:
-        df_filtered = df_filtered[~df_filtered["session_name"].isin(exclude)]
+        filtered = filtered[~filtered["session_name"].isin(exclude)]
+    return filtered
 
+
+def _outlier_filter_ui(df: pd.DataFrame) -> pd.DataFrame:
     filter_outliers = st.checkbox(
         "Remove outliers",
         value=True,
         help="Drop shots with extreme values so a few wild swings don't skew averages",
     )
-
-    if filter_outliers:
-        numeric_cols = (
-            "carry_distance",
-            "total_distance",
-            "ball_speed",
-            "launch_angle",
-            "spin_rate",
-            "apex_height",
-            "side_distance",
-            "offline_distance",
+    if not filter_outliers:
+        return df
+    numeric_cols = (
+        "carry_distance",
+        "total_distance",
+        "ball_speed",
+        "launch_angle",
+        "spin_rate",
+        "apex_height",
+        "side_distance",
+        "offline_distance",
+    )
+    cols_present = [c for c in numeric_cols if c in df.columns]
+    col_sel = st.multiselect("Outlier metrics", cols_present, default=cols_present)
+    method_choice = st.radio(
+        "Outlier detection",
+        ["Statistical", "Adaptive"],
+        help="Statistical uses z-scores/IQR; Adaptive uses Isolation Forest",
+    )
+    method = "isolation" if method_choice == "Adaptive" else "mad"
+    if method == "isolation" and IsolationForest is None:
+        st.warning(
+            "scikit-learn required for adaptive method; using statistical instead",
         )
-        cols_present = [c for c in numeric_cols if c in df_filtered.columns]
-        col_sel = st.multiselect(
-            "Outlier metrics", cols_present, default=cols_present
+        method = "mad"
+    iqr_mult = 1.5
+    contamination = "auto"
+    if method == "mad":
+        z_thresh = st.slider("Z-score threshold", 1.0, 5.0, 3.0)
+        iqr_mult = st.slider("IQR multiplier", 1.0, 3.0, 1.5)
+    else:
+        z_thresh = 3.0
+        contamination = st.slider("Contamination", 0.01, 0.5, 0.1)
+    if col_sel:
+        before = df.copy()
+        df = _apply_outlier_filter(
+            df, tuple(col_sel), z_thresh, method, iqr_mult, contamination
         )
-        method_choice = st.radio(
-            "Outlier detection",
-            ["Statistical", "Adaptive"],
-            help="Statistical uses z-scores/IQR; Adaptive uses Isolation Forest",
-        )
-        method = "isolation" if method_choice == "Adaptive" else "mad"
-        if method == "isolation" and IsolationForest is None:
-            st.warning(
-                "scikit-learn required for adaptive method; using statistical instead"
-            )
-            method = "mad"
+        removed = before.loc[~before.index.isin(df.index)]
+        if not removed.empty:
+            st.info(f"Removed {len(removed)} shots as outliers")
+            with st.expander("Show removed outliers"):
+                st.dataframe(removed)
+    return df
 
-        iqr_mult = 1.5
-        contamination = "auto"
-        if method == "mad":
-            z_thresh = st.slider("Z-score threshold", 1.0, 5.0, 3.0)
-            iqr_mult = st.slider("IQR multiplier", 1.0, 3.0, 1.5)
-        else:
-            z_thresh = 3.0
-            contamination = st.slider("Contamination", 0.01, 0.5, 0.1)
 
-        if col_sel:
-            before = df_filtered.copy()
-            df_filtered = _apply_outlier_filter(
-                df_filtered,
-                tuple(col_sel),
-                z_thresh,
-                method,
-                iqr_mult,
-                contamination,
-            )
-            removed = before.loc[~before.index.isin(df_filtered.index)]
-            if not removed.empty:
-                st.info(f"Removed {len(removed)} shots as outliers")
-                with st.expander("Show removed outliers"):
-                    st.dataframe(removed)
-
-    df_filtered = classify_shots(
-        df_filtered, carry_col="carry_distance", offline_col="offline_distance"
+def _quality_filter_ui(df: pd.DataFrame) -> pd.DataFrame:
+    df = classify_shots(
+        df, carry_col="carry_distance", offline_col="offline_distance"
     )
     if "shot_tags" in st.session_state:
         tag_map = st.session_state["shot_tags"]
-        df_filtered.loc[
-            df_filtered.index.intersection(tag_map.keys()), "Quality"
-        ] = df_filtered.index.map(tag_map)
-
+        df.loc[df.index.intersection(tag_map.keys()), "Quality"] = df.index.map(
+            tag_map
+        )
     use_quality = st.checkbox(
         "Include only 'good' shots",
         value=False,
         help="Keep shots labelled as 'good' and ignore ones tagged 'miss' or 'outlier'",
     )
-    if use_quality and "Quality" in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered["Quality"] == "good"]
+    if use_quality and "Quality" in df.columns:
+        df = df[df["Quality"] == "good"]
+    return df
 
+
+with st.expander("Advanced Filters", expanded=False):
+    df_filtered = _session_filter_ui(df, session_names)
+    df_filtered = _outlier_filter_ui(df_filtered)
+    df_filtered = _quality_filter_ui(df_filtered)
 overview_tab, benchmark_tab = st.tabs(["Overview", "Benchmarking"])
 
 # ---------------------------------------------------------------------------

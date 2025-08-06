@@ -7,7 +7,7 @@ cached on disk so the user can navigate between pages without losing data.
 
 import json
 import os
-from threading import Lock
+import uuid
 
 import pandas as pd
 import streamlit as st
@@ -15,44 +15,17 @@ import streamlit as st
 from utils.logger import logger
 from utils.session_loader import load_sessions
 from utils.responsive import configure_page
+from utils.cache import persist_state, CACHE_PATH
 
 configure_page()
 st.title("📊 Garmin R10 Analyzer")
 
-CACHE_PATH = os.path.join("sample_data", "session_cache.json")
-
-# Guard file writes so concurrent Streamlit requests don't clobber the cache
-_persist_lock = Lock()
-
-
-def persist_state() -> None:
-    """Persist uploaded file names and dataframe to disk synchronously.
-
-    The previous implementation used a background ``Timer`` to debounce writes
-    which risked data loss if the process exited before the timer fired.  This
-    version performs the write immediately using an atomic ``os.replace`` so
-    that state is always saved deterministically.
-    """
-
-    data = {
-        "files": st.session_state.get("uploaded_files", []),
-        "df": st.session_state.get("session_df", pd.DataFrame()),
-    }
-
-    try:
-        os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
-        tmp_path = f"{CACHE_PATH}.tmp"
-        with _persist_lock, open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(
-                {"files": data["files"], "df": data["df"].to_json(orient="split")},
-                f,
-            )
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp_path, CACHE_PATH)
-        logger.info("State persisted with %d file(s)", len(data["files"]))
-    except (OSError, TypeError, ValueError) as exc:  # pragma: no cover
-        logger.warning("Failed to persist state: %s", exc)
+if "session_ids" not in st.session_state:
+    st.session_state["session_ids"] = {}
+if "shot_tags" not in st.session_state:
+    st.session_state["shot_tags"] = {}
+if "practice_log" not in st.session_state:
+    st.session_state["practice_log"] = []
 
 
 def _refresh_session_views() -> None:
@@ -77,6 +50,12 @@ def load_state() -> None:
             logger.warning("Failed to load cached state: %s", exc)
             return
         st.session_state["uploaded_files"] = data.get("files", [])
+        st.session_state["shot_tags"] = {
+            int(k): v for k, v in data.get("shot_tags", {}).items()
+        }
+        st.session_state["practice_log"] = data.get("practice_log", [])
+        st.session_state["session_ids"] = data.get("session_ids", {})
+
         df_json = data.get("df")
         if df_json:
             try:
@@ -88,6 +67,23 @@ def load_state() -> None:
                 st.session_state["session_df"] = pd.DataFrame()
         else:
             st.session_state["session_df"] = pd.DataFrame()
+
+        # If session IDs are missing but files are present, generate them
+        if (
+            st.session_state.get("session_df") is not None
+            and not st.session_state["session_df"].empty
+            and "Session ID" not in st.session_state["session_df"].columns
+        ):
+            sid_map = {}
+            for fname in st.session_state["session_df"]["Source File"].unique():
+                sid = uuid.uuid4().hex
+                sid_map[fname] = sid
+                st.session_state["session_df"].loc[
+                    st.session_state["session_df"]["Source File"] == fname,
+                    "Session ID",
+                ] = sid
+            st.session_state["session_ids"] = sid_map
+
         _refresh_session_views()
 
 
@@ -130,11 +126,19 @@ if uploaded_files:
                 )
             else:
                 st.session_state["session_df"] = df_new
+
+            ids = (
+                df_new[["Session ID", "Source File"]]
+                .drop_duplicates()
+                .to_dict("records")
+            )
+            for rec in ids:
+                st.session_state["session_ids"][rec["Source File"]] = rec["Session ID"]
             _refresh_session_views()
         st.session_state["uploaded_files"].extend([f.name for f in new_files])
         persist_state()
         st.success(
-            f"✅ {len(new_files)} new file(s) uploaded. Navigate to any page to begin."
+            f"✅ {len(new_files)} new file(s) uploaded. Navigate to any page to begin.",
         )
 elif st.session_state.get("uploaded_files"):
     st.info(
@@ -150,28 +154,17 @@ def remove_file(name: str) -> None:
 
     if name not in st.session_state["uploaded_files"]:
         return
-
-    # Ensure the dataframe contains a column we can filter on. If neither
-    # identifier is present we abort to avoid desynchronising the cache.
-    if (
-        "session_df" in st.session_state
-        and not st.session_state["session_df"].empty
-        and "Source File" not in st.session_state["session_df"].columns
-        and "Session Name" not in st.session_state["session_df"].columns
-    ):
-        logger.warning("Cannot remove %s; missing identifier columns", name)
-        st.error(
-            "Uploaded data is missing 'Source File' or 'Session Name' columns."
-        )
-        return
-
     st.session_state["uploaded_files"].remove(name)
-    if "session_df" in st.session_state and not st.session_state["session_df"].empty:
-        session_df = st.session_state["session_df"]
-        if "Source File" in session_df.columns:
-            st.session_state["session_df"] = session_df[session_df["Source File"] != name]
-        elif "Session Name" in session_df.columns:
-            st.session_state["session_df"] = session_df[session_df["Session Name"] != name]
+    sid = st.session_state.get("session_ids", {}).pop(name, None)
+    if (
+        sid
+        and "session_df" in st.session_state
+        and not st.session_state["session_df"].empty
+        and "Session ID" in st.session_state["session_df"].columns
+    ):
+        st.session_state["session_df"] = st.session_state["session_df"][
+            st.session_state["session_df"]["Session ID"] != sid
+        ]
         _refresh_session_views()
     persist_state()
     _rerun()
@@ -190,6 +183,8 @@ if st.session_state.get("uploaded_files"):
         st.session_state.pop("session_df", None)
         st.session_state.pop("df_all", None)
         st.session_state.pop("club_data", None)
+        st.session_state.pop("session_ids", None)
+        st.session_state.pop("shot_tags", None)
         persist_state()
         _rerun()
 
