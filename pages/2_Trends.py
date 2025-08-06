@@ -71,7 +71,13 @@ baseline = df[df["Club"] == selected_club][metric].mean()
 fig.add_hline(y=baseline, line_dash="dash", annotation_text="Overall avg")
 st.plotly_chart(fig, use_container_width=True)
 
-window = st.slider("Rolling window", 1, 5, 3)
+window = st.slider(
+    "Rolling window",
+    1,
+    5,
+    3,
+    help="Number of sessions to include when calculating the rolling average.",
+)
 if len(club_df) >= window:
     club_df["Rolling"] = club_df[metric].rolling(window).mean()
     fig_roll = px.line(
