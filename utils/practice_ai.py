@@ -8,13 +8,18 @@ from .openai_utils import get_openai_client
 
 
 def analyze_club_stats(
-    df: pd.DataFrame, club: str, *, filter_outliers: bool = True
+    df: pd.DataFrame,
+    club: str,
+    *,
+    filter_outliers: bool = True,
+    with_summary: bool = True,
 ) -> dict | None:
-    """Analyse shots for a single club and return issues and an AI summary.
+    """Analyse shots for a single club and return issues and optionally an AI summary.
 
     ``filter_outliers`` controls whether extreme values are removed prior to
     computing statistics. Outlier removal is enabled by default but can be
-    disabled by passing ``False``.
+    disabled by passing ``False``. Set ``with_summary`` to ``False`` to skip the
+    expensive OpenAI call and return only detected issues and stats.
     """
 
     feedback = []
@@ -148,9 +153,10 @@ def analyze_club_stats(
             f"Average carry {avg_carry:.0f} yds is below target {benchmark_carry} yds."
         )
 
+    summary = summarize_with_ai(club, feedback) if with_summary else ""
     return {
         "club": club,
-        "summary": summarize_with_ai(club, feedback),
+        "summary": summary,
         "issues": feedback,
         "max_good_carry": max_good_carry,
         "avg_carry": avg_carry,
@@ -184,13 +190,14 @@ def summarize_with_ai(club: str, issues: list[str]) -> str:
         return f"(AI summary failed: {e})"
 
 def analyze_practice_session(
-    df: pd.DataFrame, *, filter_outliers: bool = True
+    df: pd.DataFrame, *, filter_outliers: bool = True, with_summary: bool = True
 ) -> list[dict]:
     """Generate practice feedback for each club in ``df``.
 
     ``filter_outliers`` mirrors the argument in :func:`analyze_club_stats` and
-    controls whether per-club analysis removes outliers. It is enabled by
-    default.
+    controls whether per-club analysis removes outliers.  ``with_summary`` can be
+    set to ``False`` to avoid calling OpenAI when only the issues or statistics
+    are needed.
     """
     # ``df`` may come from arbitrary CSVs.  Guard against the ``Club`` column
     # being missing to avoid ``KeyError``s when the caller supplies malformed
@@ -200,7 +207,9 @@ def analyze_practice_session(
     clubs = df["Club"].dropna().unique()
     results: list[dict] = []
     for club in clubs:
-        stats = analyze_club_stats(df, club, filter_outliers=filter_outliers)
+        stats = analyze_club_stats(
+            df, club, filter_outliers=filter_outliers, with_summary=with_summary
+        )
         if stats is not None:
             results.append(stats)
     return results
