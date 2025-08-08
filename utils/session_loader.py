@@ -16,9 +16,9 @@ def load_sessions(files: List[object]) -> pd.DataFrame:
 
     Sessions are named using the earliest timestamp in each file.  If multiple
     files share the same date, a session number is appended based on the
-    chronological order of their timestamps (e.g. ``2025-08-01`` and
-    ``2025-08-01 #2``).  The original file name is preserved in the ``Source
-    File`` column so files can still be removed individually later.
+    chronological order of their timestamps (e.g. ``2025-08-01 Session 1`` and
+    ``2025-08-01 Session 2``).  The original file name is preserved in the
+    ``Source File`` column so files can still be removed individually later.
 
     Each file is read into a dataframe, normalised so that a ``Club`` column is
     always present and annotated with session metadata. Any files that fail to
@@ -33,8 +33,11 @@ def load_sessions(files: List[object]) -> pd.DataFrame:
             df = pd.read_csv(
                 file, encoding="utf-8", encoding_errors="replace", on_bad_lines="error"
             )
-            if "Club" not in df.columns and "Club Type" in df.columns:
-                df["Club"] = df["Club Type"]
+            if "Club" not in df.columns:
+                if "Club Name" in df.columns:
+                    df["Club"] = df["Club Name"]
+                elif "Club Type" in df.columns:
+                    df["Club"] = df["Club Type"]
             df = derive_offline_distance(df)
 
             first_dt = pd.NaT
@@ -76,11 +79,12 @@ def load_sessions(files: List[object]) -> pd.DataFrame:
             date_str = first_dt.date().isoformat()
             counts[date_str] = counts.get(date_str, 0) + 1
             count = counts[date_str]
-            session_name = (
-                f"{date_str} #{count}" if count > 1 else date_str
-            )
+            session_name = f"{date_str} Session {count}"
         else:
-            session_name = file_name
+            # If there is no valid date column fall back to the file name and
+            # still ensure uniqueness via an incrementing counter per name.
+            counts[file_name] = counts.get(file_name, 0) + 1
+            session_name = f"{file_name} Session {counts[file_name]}"
 
         df["Session Name"] = session_name
         df["Source File"] = file_name
